@@ -1,0 +1,27 @@
+node_modules/
+.next/
+out/
+build/
+.npm-cache/
+*.tsbuildinfo
+next-env.d.ts
+
+# Local data (SQLite + local object storage)
+data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Secrets — env only, never commit
+.env
+.env.local
+.env.*.local
+
+# Test artifacts
+.e2e-data/
+playwright-report/
+test-results/
+coverage/
+
+.DS_Store

@@ -1,0 +1,348 @@
+import type {
+  Assessment,
+  ChatMessage,
+  Content,
+  ContentSource,
+  Evidence,
+  Goal,
+  KnowledgeExample,
+  KnowledgeItem,
+  KnowledgeRelation,
+  LearnerState,
+  LearningActivity,
+  LearningEvent,
+  LearningPreference,
+  LearningSession,
+  LearningTarget,
+  Memory,
+  ModalityStat,
+  Recommendation,
+  RecommendationFactors,
+  SessionSummary,
+  TransferEvidence,
+  User,
+  UserContext,
+} from '@/domain/entities';
+import type {
+  ActivityItemStatus,
+  ActivityKind,
+  ActivityType,
+  AttentionLevel,
+  ContentOrigin,
+  EventSource,
+  EventType,
+  GoalStatus,
+  Intent,
+  KnowledgeRelationType,
+  KnowledgeStatus,
+  KnowledgeType,
+  MemoryKind,
+  Modality,
+  SessionStatus,
+  SkillKind,
+  SourceType,
+  SubjectType,
+  TransferEvidenceType,
+  Trend,
+} from '@/domain/enums';
+import type {
+  assessments,
+  chatMessages,
+  contentSources,
+  contents,
+  goals,
+  knowledgeItems,
+  knowledgeRelations,
+  learnerStates,
+  learningActivities,
+  learningEvents,
+  learningPreferences,
+  learningSessions,
+  learningTargets,
+  memories,
+  recommendations,
+  transferEvidences,
+  userContexts,
+  users,
+} from './schema';
+
+type Row<T extends { $inferSelect: unknown }> = T['$inferSelect'];
+
+/**
+ * Row <-> entity mapping. Keeps enum casts in one place so the rest of the
+ * infrastructure stays free of `as` noise.
+ */
+
+export const toUser = (row: Row<typeof users>): User => ({
+  id: row.id,
+  displayName: row.displayName,
+  nativeLanguage: row.nativeLanguage,
+  createdAt: row.createdAt,
+  updatedAt: row.updatedAt,
+});
+
+export const toGoal = (row: Row<typeof goals>): Goal => ({
+  id: row.id,
+  learnerId: row.learnerId,
+  languageCode: row.languageCode,
+  title: row.title,
+  rawInput: row.rawInput,
+  description: row.description,
+  scenarios: row.scenarios ?? [],
+  status: row.status as GoalStatus,
+  priority: row.priority,
+  isPrimary: row.isPrimary,
+  createdAt: row.createdAt,
+  updatedAt: row.updatedAt,
+});
+
+export const toTarget = (row: Row<typeof learningTargets>): LearningTarget => ({
+  id: row.id,
+  goalId: row.goalId,
+  learnerId: row.learnerId,
+  skill: row.skill as SkillKind,
+  importance: row.importance,
+  description: row.description,
+  status: row.status as GoalStatus,
+  createdAt: row.createdAt,
+  updatedAt: row.updatedAt,
+});
+
+export const toContentSource = (row: Row<typeof contentSources>): ContentSource => ({
+  id: row.id,
+  learnerId: row.learnerId,
+  type: row.type as SourceType,
+  origin: row.origin as ContentOrigin,
+  title: row.title,
+  url: row.url,
+  extractionMethod: row.extractionMethod,
+  aiGenerated: row.aiGenerated,
+  createdAt: row.createdAt,
+});
+
+export const toContent = (row: Row<typeof contents>): Content => ({
+  id: row.id,
+  sourceId: row.sourceId,
+  learnerId: row.learnerId,
+  languageCode: row.languageCode,
+  kind: row.kind as Content['kind'],
+  text: row.text,
+  metadata: row.metadata ?? null,
+  createdAt: row.createdAt,
+});
+
+export const toKnowledgeItem = (row: Row<typeof knowledgeItems>): KnowledgeItem => ({
+  id: row.id,
+  learnerId: row.learnerId,
+  languageCode: row.languageCode,
+  type: row.type as KnowledgeType,
+  text: row.text,
+  normalizedText: row.normalizedText,
+  meaning: row.meaning,
+  notes: row.notes,
+  examples: (row.examples ?? []) as KnowledgeExample[],
+  tags: row.tags ?? [],
+  origin: row.origin as ContentOrigin,
+  sourceType: row.sourceType as SourceType,
+  sourceId: row.sourceId,
+  sourceRef: row.sourceRef,
+  aiGenerated: row.aiGenerated,
+  status: row.status as KnowledgeStatus,
+  createdAt: row.createdAt,
+  updatedAt: row.updatedAt,
+});
+
+export const toRelation = (row: Row<typeof knowledgeRelations>): KnowledgeRelation => ({
+  id: row.id,
+  learnerId: row.learnerId,
+  fromItemId: row.fromItemId,
+  toItemId: row.toItemId,
+  type: row.type as KnowledgeRelationType,
+  note: row.note,
+  createdAt: row.createdAt,
+});
+
+export const toLearnerState = (row: Row<typeof learnerStates>): LearnerState => ({
+  id: row.id,
+  learnerId: row.learnerId,
+  subjectType: row.subjectType as SubjectType,
+  subjectId: row.subjectId,
+  mastery: row.mastery,
+  confidence: row.confidence,
+  exposureCount: row.exposureCount,
+  successfulAttempts: row.successfulAttempts,
+  failedAttempts: row.failedAttempts,
+  recentPerformance: row.recentPerformance,
+  historicalPerformance: row.historicalPerformance,
+  stabilityDays: row.stabilityDays,
+  easeFactor: row.easeFactor,
+  repetitions: row.repetitions,
+  retrievalStrength: row.retrievalStrength,
+  modalityStats: (row.modalityStats ?? {}) as Partial<Record<Modality, ModalityStat>>,
+  recentEvidence: (row.recentEvidence ?? []) as Evidence[],
+  transferScore: row.transferScore,
+  transferConfidence: row.transferConfidence,
+  trend: row.trend as Trend,
+  lastPracticedAt: row.lastPracticedAt,
+  nextReviewAt: row.nextReviewAt,
+  userDeclaredMastered: row.userDeclaredMastered,
+  createdAt: row.createdAt,
+  updatedAt: row.updatedAt,
+});
+
+export const toEvent = (row: Row<typeof learningEvents>): LearningEvent => ({
+  id: row.id,
+  learnerId: row.learnerId,
+  sessionId: row.sessionId,
+  type: row.type as EventType,
+  occurredAt: row.occurredAt,
+  payload: row.payload ?? {},
+  source: row.source as EventSource,
+  version: row.version,
+  idempotencyKey: row.idempotencyKey,
+  createdAt: row.createdAt,
+});
+
+export const toAssessment = (row: Row<typeof assessments>): Assessment => ({
+  id: row.id,
+  learnerId: row.learnerId,
+  eventId: row.eventId,
+  sessionId: row.sessionId,
+  activityId: row.activityId,
+  subjectType: row.subjectType as SubjectType,
+  subjectId: row.subjectId,
+  modality: row.modality as Modality,
+  score: row.score,
+  correct: row.correct,
+  difficulty: row.difficulty,
+  responseTimeMs: row.responseTimeMs,
+  userAnswer: row.userAnswer,
+  expectedAnswer: row.expectedAnswer,
+  source: row.source as EventSource,
+  userCorrected: row.userCorrected,
+  occurredAt: row.occurredAt,
+});
+
+export const toSession = (row: Row<typeof learningSessions>): LearningSession => ({
+  id: row.id,
+  learnerId: row.learnerId,
+  goalId: row.goalId,
+  recommendationId: row.recommendationId,
+  activityType: row.activityType as ActivityType,
+  status: row.status as SessionStatus,
+  plannedDurationMinutes: row.plannedDurationMinutes,
+  correctionEnabled: row.correctionEnabled,
+  startedAt: row.startedAt,
+  lastActiveAt: row.lastActiveAt,
+  pausedAt: row.pausedAt,
+  endedAt: row.endedAt,
+  summary: (row.summary ?? null) as SessionSummary | null,
+  clientToken: row.clientToken,
+  createdAt: row.createdAt,
+  updatedAt: row.updatedAt,
+});
+
+export const toActivity = (row: Row<typeof learningActivities>): LearningActivity => ({
+  id: row.id,
+  sessionId: row.sessionId,
+  learnerId: row.learnerId,
+  position: row.position,
+  kind: row.kind as ActivityKind,
+  modality: row.modality as Modality,
+  subjectType: row.subjectType as SubjectType,
+  subjectId: row.subjectId,
+  prompt: row.prompt,
+  options: row.options ?? null,
+  expectedAnswer: row.expectedAnswer,
+  hint: row.hint,
+  status: row.status as ActivityItemStatus,
+  createdAt: row.createdAt,
+  updatedAt: row.updatedAt,
+});
+
+export const toChatMessage = (row: Row<typeof chatMessages>): ChatMessage => ({
+  id: row.id,
+  sessionId: row.sessionId,
+  learnerId: row.learnerId,
+  role: row.role as ChatMessage['role'],
+  text: row.text,
+  aiGenerated: row.aiGenerated,
+  meta: row.meta ?? null,
+  createdAt: row.createdAt,
+});
+
+export const toMemory = (row: Row<typeof memories>): Memory => ({
+  id: row.id,
+  learnerId: row.learnerId,
+  kind: row.kind as MemoryKind,
+  key: row.key,
+  content: row.content,
+  confidence: row.confidence,
+  evidenceCount: row.evidenceCount,
+  lastObservedAt: row.lastObservedAt,
+  status: row.status as Memory['status'],
+  createdAt: row.createdAt,
+  updatedAt: row.updatedAt,
+});
+
+export const toPreference = (row: Row<typeof learningPreferences>): LearningPreference => ({
+  id: row.id,
+  learnerId: row.learnerId,
+  key: row.key,
+  value: row.value,
+  confidence: row.confidence,
+  evidenceCount: row.evidenceCount,
+  source: row.source as LearningPreference['source'],
+  lastObservedAt: row.lastObservedAt,
+  createdAt: row.createdAt,
+  updatedAt: row.updatedAt,
+});
+
+export const toUserContext = (row: Row<typeof userContexts>): UserContext => ({
+  id: row.id,
+  learnerId: row.learnerId,
+  capturedAt: row.capturedAt,
+  availableMinutes: row.availableMinutes,
+  device: row.device as UserContext['device'],
+  canSpeak: row.canSpeak,
+  canListen: row.canListen,
+  canType: row.canType,
+  canRead: row.canRead,
+  attention: row.attention as AttentionLevel,
+  intent: row.intent as Intent,
+  note: row.note,
+  rawInput: row.rawInput,
+});
+
+export const toRecommendation = (row: Row<typeof recommendations>): Recommendation => ({
+  id: row.id,
+  learnerId: row.learnerId,
+  goalId: row.goalId,
+  activityType: row.activityType as ActivityType,
+  score: row.score,
+  reason: row.reason,
+  factors: (row.factors ?? {}) as unknown as RecommendationFactors,
+  subjectIds: row.subjectIds ?? [],
+  plannedDurationMinutes: row.plannedDurationMinutes,
+  estimatedItemCount: row.estimatedItemCount,
+  status: row.status as Recommendation['status'],
+  requiresAi: row.requiresAi,
+  generatedAt: row.generatedAt,
+});
+
+export const toTransferEvidence = (
+  row: Row<typeof transferEvidences>,
+): TransferEvidence => ({
+  id: row.id,
+  learnerId: row.learnerId,
+  goalId: row.goalId,
+  subjectType: row.subjectType as SubjectType,
+  subjectId: row.subjectId,
+  scenario: row.scenario,
+  evidenceType: row.evidenceType as TransferEvidenceType,
+  score: row.score,
+  confidence: row.confidence,
+  note: row.note,
+  occurredAt: row.occurredAt,
+  createdAt: row.createdAt,
+});

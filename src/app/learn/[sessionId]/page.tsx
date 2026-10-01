@@ -1,0 +1,226 @@
+import Link from 'next/link';
+import { notFound, redirect } from 'next/navigation';
+import {
+  abandonSessionAction,
+  completeSessionAction,
+  pauseSessionAction,
+  skipActivityAction,
+} from '@/app/actions/learning';
+import { completeSession, getSessionView } from '@/application/sessions';
+import { ActivityRunner } from '@/components/learn/ActivityRunner';
+import { ACTIVITY_LABELS } from '@/components/labels';
+import { Card, EmptyState, LinkButton, buttonStyles } from '@/components/ui';
+import { DomainError } from '@/domain/errors';
+import { app } from '@/server/app';
+
+export const dynamic = 'force-dynamic';
+
+export default async function LearnPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ sessionId: string }>;
+  searchParams: Promise<{ a?: string }>;
+}) {
+  const { sessionId } = await params;
+  const { a: requestedActivityId } = await searchParams;
+  const { ctx, learnerId } = app();
+
+  let view;
+  try {
+    view = await getSessionView(ctx, learnerId, sessionId);
+  } catch (error) {
+    if (error instanceof DomainError && error.code === 'not_found') notFound();
+    throw error;
+  }
+
+  const { session, activities, nextActivity, progress, knowledgeById } = view;
+  const finished = session.status === 'completed' || session.status === 'abandoned';
+
+  if (activities.length === 0) {
+    return (
+      <div className="space-y-4">
+        <Header title={ACTIVITY_LABELS[session.activityType]} />
+        <EmptyState
+          title="这次没有可用的练习内容"
+          description="你的知识库里还没有足够的条目来生成这个练习。先添加几条，或者直接开始一次对话。"
+          action={<LinkButton href="/knowledge?new=1" variant="primary">添加知识条目</LinkButton>}
+        />
+        <form action={abandonSessionAction}>
+          <input type="hidden" name="sessionId" value={session.id} />
+          <button type="submit" className={buttonStyles.ghost}>
+            退出
+          </button>
+        </form>
+      </div>
+    );
+  }
+
+  const pinned = requestedActivityId
+    ? activities.find((activity) => activity.id === requestedActivityId)
+    : undefined;
+
+  // A pinned activity keeps rendering even after it was answered, so the
+  // learner sees the result before moving on.
+  if (finished || (!nextActivity && !pinned)) {
+    if (!finished) {
+      // Everything is done: close the session (idempotent) and show the summary.
+      await completeSession(ctx, { learnerId, sessionId: session.id });
+      view = await getSessionView(ctx, learnerId, sessionId);
+    }
+    const summary = view.session.summary;
+    return (
+      <div className="space-y-5">
+        <Header title={`${ACTIVITY_LABELS[session.activityType]}·总结`} />
+        <Card>
+          <p className="text-sm text-ink-600">
+            {view.session.status === 'abandoned'
+              ? '这次提前结束了——完全没问题，记录都保存好了。'
+              : '这次完成了。下面是实际发生的事，不是打分。'}
+          </p>
+          <dl className="mt-4 grid grid-cols-3 gap-4 text-sm">
+            <div>
+              <dt className="text-xs text-ink-400">作答</dt>
+              <dd className="mt-0.5 text-xl font-semibold tabular-nums">
+                {summary?.completedItems ?? progress.answered}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-ink-400">答对</dt>
+              <dd className="mt-0.5 text-xl font-semibold tabular-nums">
+                {summary?.correctItems ?? 0}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-ink-400">跳过</dt>
+              <dd className="mt-0.5 text-xl font-semibold tabular-nums">
+                {summary?.skippedItems ?? progress.skipped}
+              </dd>
+            </div>
+          </dl>
+
+          {summary?.difficulties.length ? (
+            <div className="mt-4 border-t border-ink-100 pt-3">
+              <p className="text-xs text-ink-400">这几条这次没答对，之后会再出现：</p>
+              <ul className="mt-1.5 flex flex-wrap gap-1.5">
+                {summary.difficulties.map((text) => (
+                  <li
+                    key={text}
+                    className="rounded-full bg-ink-100 px-2 py-0.5 text-xs text-ink-600"
+                  >
+                    {text}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {summary?.knowledgeItemIds.length ? (
+            <div className="mt-4 border-t border-ink-100 pt-3">
+              <p className="text-xs text-ink-400">涉及的知识条目</p>
+              <ul className="mt-1.5 flex flex-wrap gap-1.5">
+                {summary.knowledgeItemIds.slice(0, 12).map((id) => {
+                  const item = knowledgeById[id];
+                  return item ? (
+                    <li key={id}>
+                      <Link
+                        href={`/knowledge/${id}`}
+                        className="rounded-full border border-ink-200 px-2 py-0.5 text-xs text-ink-600 hover:bg-ink-50"
+                      >
+                        {item.text}
+                      </Link>
+                    </li>
+                  ) : null;
+                })}
+              </ul>
+            </div>
+          ) : null}
+        </Card>
+
+        <div className="flex flex-wrap gap-2">
+          <LinkButton href="/" variant="primary">
+            回首页
+          </LinkButton>
+          <LinkButton href={`/history/${session.id}`}>查看这次记录</LinkButton>
+        </div>
+      </div>
+    );
+  }
+
+  /**
+   * The current activity is pinned in the URL (`?a=`). A server action re-render
+   * therefore keeps showing the same question, so the learner actually sees the
+   * feedback for their answer instead of being jumped to the next item.
+   */
+  if (!pinned && nextActivity) {
+    redirect(`/learn/${session.id}?a=${nextActivity.id}`);
+  }
+  if (!pinned) {
+    redirect(`/learn/${session.id}`);
+  }
+
+  const current = pinned;
+  const currentItem = knowledgeById[current.subjectId];
+  const answeredPosition =
+    activities.filter(
+      (activity) => activity.status !== 'pending' && activity.position < current.position,
+    ).length + 1;
+
+  return (
+    <div className="space-y-5">
+      <Header title={ACTIVITY_LABELS[session.activityType]} />
+
+      <ActivityRunner
+        key={current.id}
+        activity={current}
+        alreadyAnswered={current.status !== 'pending'}
+        meaningHint={currentItem?.meaning ?? null}
+        sessionId={session.id}
+        position={answeredPosition}
+        total={progress.total}
+      />
+
+      <div className="flex flex-wrap items-center gap-2 border-t border-ink-100 pt-4">
+        <form action={skipActivityAction}>
+          <input type="hidden" name="sessionId" value={session.id} />
+          <input type="hidden" name="activityId" value={current.id} />
+          <button type="submit" className={buttonStyles.ghost} data-testid="skip-activity">
+            跳过这个
+          </button>
+        </form>
+        <form action={pauseSessionAction}>
+          <input type="hidden" name="sessionId" value={session.id} />
+          <button type="submit" className={buttonStyles.ghost} data-testid="pause-session">
+            先暂停
+          </button>
+        </form>
+        <form action={completeSessionAction}>
+          <input type="hidden" name="sessionId" value={session.id} />
+          <button type="submit" className={buttonStyles.ghost}>
+            就到这里
+          </button>
+        </form>
+        <form action={abandonSessionAction}>
+          <input type="hidden" name="sessionId" value={session.id} />
+          <button type="submit" className={buttonStyles.ghost}>
+            退出
+          </button>
+        </form>
+      </div>
+      <p className="text-xs text-ink-400">
+        随时可以走，不需要理由。没做完不算失败，进度会留着。
+      </p>
+    </div>
+  );
+}
+
+function Header({ title }: { title: string }) {
+  return (
+    <header className="flex items-center justify-between gap-3">
+      <h1 className="text-lg font-semibold">{title}</h1>
+      <Link href="/" className="text-xs text-ink-400 hover:text-ink-900">
+        返回首页
+      </Link>
+    </header>
+  );
+}

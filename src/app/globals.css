@@ -1,0 +1,43 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-ink-50: #f7f7f6;
+  --color-ink-100: #ecedeb;
+  --color-ink-200: #d9dbd7;
+  --color-ink-400: #8b8f89;
+  --color-ink-600: #55594f;
+  --color-ink-900: #1c1e1a;
+  --color-accent-50: #eef6f2;
+  --color-accent-100: #d7ebe1;
+  --color-accent-500: #2f7a5b;
+  --color-accent-600: #26654b;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei', sans-serif;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--color-ink-50);
+  color: var(--color-ink-900);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Visible focus for keyboard users. */
+:where(a, button, input, textarea, select, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-accent-500);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
