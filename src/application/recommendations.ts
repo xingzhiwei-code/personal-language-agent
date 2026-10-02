@@ -7,6 +7,7 @@ import { scoreCandidates } from '@/scheduler/scoring';
 import type { DueReviewSummary, SchedulerSnapshot } from '@/scheduler/types';
 import { getCurrentContext } from './context';
 import { appendEvent } from './events';
+import { ensureDailyPoolPromotion } from './knowledge-pool';
 import type { AppContext } from './types';
 
 const REJECTION_TTL_MS = 60 * 60 * 1000;
@@ -57,13 +58,16 @@ export async function buildSchedulerSnapshot(
     statuses: ['active'],
     limit: MAX_POOL,
   });
-  const practicePool: { item: KnowledgeItem; state: LearnerState | null }[] = [];
-  for (const item of activeItems) {
-    practicePool.push({
-      item,
-      state: await ctx.repos.states.find(learnerId, 'knowledge_item', item.id),
-    });
-  }
+  const knowledgeStates = await ctx.repos.states.listBySubjectIds(
+    learnerId,
+    'knowledge_item',
+    activeItems.map((item) => item.id),
+  );
+  const stateByItem = new Map(knowledgeStates.map((state) => [state.subjectId, state]));
+  const practicePool = activeItems.map((item) => ({
+    item,
+    state: stateByItem.get(item.id) ?? null,
+  }));
 
   const dueReviews: DueReviewSummary[] = dueCandidates.map((candidate) => ({
     subjectId: candidate.item.id,
@@ -81,6 +85,12 @@ export async function buildSchedulerSnapshot(
     )
     .map((recommendation) => recommendation.activityType);
 
+  const sentenceItems = activeItems.filter(
+    (item) => item.examples.length > 0 || item.type === 'sentence',
+  );
+  const grammarItems = activeItems.filter(
+    (item) => item.type === 'grammar' || item.type === 'pattern',
+  );
   const snapshot: SchedulerSnapshot = {
     nowIso: now,
     goal: goal
@@ -95,12 +105,11 @@ export async function buildSchedulerSnapshot(
     skillStates,
     dueReviews,
     knowledgeCount: activeItems.length,
-    sentenceCount: activeItems.filter(
-      (item) => item.examples.length > 0 || item.type === 'sentence',
-    ).length,
-    grammarItemCount: activeItems.filter(
-      (item) => item.type === 'grammar' || item.type === 'pattern',
-    ).length,
+    knowledgeItemIds: activeItems.map((item) => item.id),
+    sentenceCount: sentenceItems.length,
+    sentenceItemIds: sentenceItems.map((item) => item.id),
+    grammarItemCount: grammarItems.length,
+    grammarItemIds: grammarItems.map((item) => item.id),
     context: await getCurrentContext(ctx, learnerId),
     preferences: await ctx.repos.preferences.listByLearner(learnerId),
     recentActivityTypes: await ctx.repos.sessions.listRecentActivityTypes(learnerId, 5),
@@ -122,9 +131,41 @@ export async function generateRecommendations(
   ctx: AppContext,
   learnerId: string,
   limit = 3,
+  options: { excludedActivityTypes?: ActivityType[]; excludedSubjectIds?: string[] } = {},
 ): Promise<RecommendationBundle> {
+  const promotion = await ensureDailyPoolPromotion(ctx, learnerId);
   const { snapshot, dueCandidates } = await buildSchedulerSnapshot(ctx, learnerId);
-  const scored = scoreCandidates(snapshot).slice(0, limit);
+  const excludedActivities = new Set(options.excludedActivityTypes ?? []);
+  const excludedSubjects = new Set(options.excludedSubjectIds ?? []);
+  const promotedIds = promotion.promoted.map((item) => item.id);
+  const scored = scoreCandidates(snapshot)
+    .filter((candidate) => !excludedActivities.has(candidate.activityType))
+    .map((candidate) => {
+      const availableIds = [
+        ...new Set([
+          ...(candidate.activityType !== 'conversation' ? promotedIds : []),
+          ...candidate.subjectIds,
+        ]),
+      ].filter((id) => !excludedSubjects.has(id));
+      const subjectIds =
+        candidate.estimatedItemCount > 0
+          ? availableIds.slice(0, candidate.estimatedItemCount)
+          : availableIds;
+      return {
+        ...candidate,
+        subjectIds,
+        estimatedItemCount:
+          candidate.estimatedItemCount > 0
+            ? Math.min(candidate.estimatedItemCount, subjectIds.length)
+            : candidate.estimatedItemCount,
+        reason:
+          promotedIds.length > 0 && promotion.reason
+            ? `${candidate.reason}；今日新词依据：${promotion.reason}`
+            : candidate.reason,
+      };
+    })
+    .filter((candidate) => candidate.estimatedItemCount === 0 || candidate.subjectIds.length > 0)
+    .slice(0, limit);
   const now = ctx.clock.nowIso();
   const goalId = snapshot.goal?.id ?? null;
 

@@ -23,9 +23,12 @@ export interface SchedulerSnapshot {
   dueReviews: DueReviewSummary[];
   /** Total active knowledge items available for practice. */
   knowledgeCount: number;
+  knowledgeItemIds: string[];
   /** Items that can drive reading/production practice (have example sentences). */
   sentenceCount: number;
+  sentenceItemIds: string[];
   grammarItemCount: number;
+  grammarItemIds: string[];
   context: UserContext | null;
   preferences: LearningPreference[];
   /** Most recent first. */

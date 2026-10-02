@@ -4,8 +4,8 @@ import { getHomeView } from '@/application/home';
 import { startChatAction } from '@/app/actions/chat';
 import { resumeSessionAction, startSessionAction } from '@/app/actions/learning';
 import { GoalForm } from '@/components/GoalForm';
+import { DailyPlan } from '@/components/home/DailyPlan';
 import { IntentInput } from '@/components/home/IntentInput';
-import { RecommendationCard } from '@/components/home/RecommendationCard';
 import { ACTIVITY_LABELS, SKILL_LABELS, TREND_LABELS } from '@/components/labels';
 import {
   Badge,
@@ -95,13 +95,16 @@ async function HomeContent() {
 
       {timeNote ? <InfoNote>{timeNote}</InfoNote> : null}
 
-      {view.primary ? (
-        <RecommendationCard recommendation={view.primary} />
+      {view.primary || view.restingToday ? (
+        <DailyPlan
+          recommendations={view.primary ? [view.primary, ...view.alternatives] : []}
+          restingToday={view.restingToday}
+        />
       ) : (
         <EmptyState
           title="还没有可以安排的练习"
-          description="先往知识库里加几个你最近遇到的表达，或者直接开始一次对话。系统只会推荐真正能给你的活动，不会编内容。"
-          action={<LinkButton href="/knowledge?new=1" variant="primary">添加第一条知识</LinkButton>}
+          description="先导入一个词库或添加最近遇到的表达。系统只会推荐真正能交付的活动，不会编内容。"
+          action={<LinkButton href="/knowledge/import" variant="primary">导入学习内容</LinkButton>}
         />
       )}
 
@@ -200,7 +203,7 @@ async function HomeContent() {
 
       {!view.aiAvailable ? (
         <p className="text-xs text-ink-400">
-          当前没有配置 AI Provider：对话和解释不可用，但复习、知识库、历史和学习状态完全正常。
+          当前没有配置 AI Provider：对话、解释和文本提炼不可用，但原文保存、复习、知识库、历史和学习状态完全正常。
           配置方式见 <Link href="/settings" className="underline">设置</Link>。
         </p>
       ) : null}

@@ -1,0 +1,12 @@
+[
+  {"word": "abandon", "phonetic": "/əˈbændən/", "pos": "v.", "definition": "放弃；抛弃", "example": "Never abandon hope in difficult times."},
+  {"word": "figure out", "pos": "phr.", "definition": "弄清楚；想出", "example": "I finally figured out how to solve the problem."},
+  {"word": "resilient", "phonetic": "/rɪˈzɪliənt/", "pos": "adj.", "definition": "有弹性的；能快速恢复的", "example": "She is resilient enough to bounce back from failure."},
+  {"word": "put off", "pos": "phr.", "definition": "推迟；拖延", "example": "Don't put off until tomorrow what you can do today."},
+  {"word": "meticulous", "phonetic": "/məˈtɪkjʊləs/", "pos": "adj.", "definition": "一丝不苟的；极其细致的", "example": "He is meticulous about details in his work."},
+  {"word": "break down", "pos": "phr.", "definition": "分解；分析；（机器）出故障", "example": "Let's break down the problem into smaller steps."},
+  {"word": "leverage", "phonetic": "/ˈlevərɪdʒ/", "pos": "v./n.", "definition": "利用；杠杆作用", "example": "We can leverage existing tools to speed up development."},
+  {"word": "ambiguous", "phonetic": "/æmˈbɪɡjuəs/", "pos": "adj.", "definition": "模糊的；有歧义的", "example": "The instructions were ambiguous and hard to follow."},
+  {"word": "run into", "pos": "phr.", "definition": "偶然遇到；遭遇（困难）", "example": "We ran into an unexpected bug during testing."},
+  {"word": "concise", "phonetic": "/kənˈsaɪs/", "pos": "adj.", "definition": "简洁的；简明扼要的", "example": "Please write a concise summary of the article."}
+]

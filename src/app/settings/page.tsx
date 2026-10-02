@@ -2,6 +2,8 @@ import { retireMemoryAction } from '@/app/actions/data';
 import { DELETE_CONFIRMATION_PHRASE } from '@/application/data-management';
 import { listMemories } from '@/application/memory';
 import { DataControls } from '@/components/settings/DataControls';
+import { NewWordBudgetForm } from '@/components/settings/NewWordBudgetForm';
+import { DEFAULT_DAILY_NEW_WORD_BUDGET } from '@/application/knowledge-pool';
 import { Badge, Card, SectionTitle, formatDateTime } from '@/components/ui';
 import { getTelemetry } from '@/infrastructure/observability/telemetry';
 import { app } from '@/server/app';
@@ -13,6 +15,8 @@ export default async function SettingsPage() {
   const aiAvailable = ctx.llm.isConfigured();
   const memories = await listMemories(ctx, learnerId);
   const preferences = await ctx.repos.preferences.listByLearner(learnerId);
+  const budgetPreference = preferences.find((preference) => preference.key === 'daily_new_word_budget');
+  const dailyBudget = budgetPreference ? Number(budgetPreference.value) : DEFAULT_DAILY_NEW_WORD_BUDGET;
   const eventCount = await ctx.repos.events.countByLearner(learnerId);
   const stats = getTelemetry().stats();
 
@@ -20,7 +24,7 @@ export default async function SettingsPage() {
     <div className="space-y-5">
       <header>
         <h1 className="text-lg font-semibold">设置与数据</h1>
-        <p className="mt-1 text-sm text-ink-600">版本 V0.1 · 单用户 · 本地优先</p>
+        <p className="mt-1 text-sm text-ink-600">版本 V0.2 · 单用户 · 本地优先</p>
       </header>
 
       <Card>
@@ -64,12 +68,19 @@ export default async function SettingsPage() {
       </Card>
 
       <Card>
+        <SectionTitle title="每日新词预算" hint="从词库池确定性选择，不调用 AI" />
+        <NewWordBudgetForm
+          value={Number.isInteger(dailyBudget) && dailyBudget >= 0 && dailyBudget <= 50 ? dailyBudget : DEFAULT_DAILY_NEW_WORD_BUDGET}
+        />
+      </Card>
+
+      <Card>
         <SectionTitle title="隐私说明" hint="不夸大，也不隐瞒" />
         <ul className="space-y-1.5 text-sm text-ink-600">
           <li>· 学习数据保存在本机 SQLite 文件里，不会自动上传。</li>
           <li>
             ·
-            只有在你使用对话或语言解释时，才会把“当前目标、相关技能、最近错误、相关知识、当前会话的最近几轮对话”发送给你配置的 AI 服务商——不会发送整个数据库或全部聊天历史。
+            使用对话或语言解释时，只发送裁剪后的目标、技能、错误、相关知识和最近对话；使用文本提炼时，会发送你本次主动粘贴的文本。不会发送整个数据库或全部聊天历史。
           </li>
           <li>· 不做行为分析、不做广告、不收集完成功能以外的数据。</li>
           <li>· 复习、知识库、历史和学习状态完全不需要联网。</li>

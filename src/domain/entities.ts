@@ -10,16 +10,23 @@ import {
   feedbackKindSchema,
   goalStatusSchema,
   intentSchema,
+  knowledgeEntryMethodSchema,
+  knowledgeOperationTypeSchema,
   knowledgeRelationTypeSchema,
   knowledgeStatusSchema,
   knowledgeTypeSchema,
   languageCodeSchema,
   memoryKindSchema,
   modalitySchema,
+  operationStatusSchema,
+  operationTypeSchema,
+  scenarioStatusSchema,
+  scenarioTypeSchema,
   sessionStatusSchema,
   skillKindSchema,
   sourceTypeSchema,
   subjectTypeSchema,
+  timeContextPresetSchema,
   transferEvidenceTypeSchema,
   trendSchema,
 } from './enums';
@@ -141,6 +148,18 @@ export const knowledgeItemSchema = z.object({
   sourceRef: z.string().max(2000).nullable(),
   aiGenerated: z.boolean(),
   status: knowledgeStatusSchema,
+  /**
+   * Which imported wordlist this item came from (v0.2 §F1). Null for manually
+   * added items. Drives the `wordlist_binding` term of the relevance score.
+   */
+  wordlistId: idSchema.nullable(),
+  /** How this item entered the library; drives the operation log's `source`. */
+  entryMethod: knowledgeEntryMethodSchema,
+  /**
+   * Normalised frequency rank within its import batch (0..1, lower = more
+   * common). Null when unknown, which the relevance score treats as neutral.
+   */
+  frequencyRank: z.number().min(0).max(1).nullable(),
   createdAt: timestampSchema,
   updatedAt: timestampSchema,
 });
@@ -436,6 +455,113 @@ export const transferEvidenceSchema = z.object({
   createdAt: timestampSchema,
 });
 export type TransferEvidence = z.infer<typeof transferEvidenceSchema>;
+
+/**
+ * Deterministic time horizon for a scenario. Stored as a preset (not free text)
+ * so "does it expire?" is a pure rule and never needs an LLM to parse "下周"
+ * (v0.2 §F7 生命周期). `free_text` is kept for display only.
+ */
+export const timeContextSchema = z.object({
+  preset: timeContextPresetSchema,
+  /** Original words the user typed, e.g. "下周去旅游". Display only. */
+  freeText: z.string().max(120).nullable(),
+  /**
+   * Resolved deadline, computed from `preset` + the declared date. Null for
+   * `long_term`, which never expires.
+   */
+  resolvedDueAt: timestampSchema.nullable(),
+});
+export type TimeContext = z.infer<typeof timeContextSchema>;
+
+export const scenarioSchema = z.object({
+  id: idSchema,
+  learnerId: idSchema,
+  /** Optional: a scenario can exist independently of any goal. */
+  goalId: idSchema.nullable(),
+  /** Set when this is a small scenario inside a big one. */
+  parentId: idSchema.nullable(),
+  name: z.string().min(1).max(120),
+  type: scenarioTypeSchema,
+  timeContext: timeContextSchema.nullable(),
+  status: scenarioStatusSchema,
+  /** Knowledge items the user attached to this scenario (e.g. from F2). */
+  knowledgeItemIds: z.array(idSchema).max(20_000),
+  createdAt: timestampSchema,
+  updatedAt: timestampSchema,
+});
+export type Scenario = z.infer<typeof scenarioSchema>;
+
+/**
+ * A named collection of imported knowledge (v0.2 §F1). It is the unit that a
+ * goal is bound to for relevance scoring, and what the pool browser groups by.
+ */
+export const wordlistSchema = z.object({
+  id: idSchema,
+  learnerId: idSchema,
+  name: z.string().min(1).max(120),
+  languageCode: languageCodeSchema,
+  /** Which goal this wordlist serves; drives relevance scoring (v0.2 §F6). */
+  goalId: idSchema.nullable(),
+  /** Lowercased keywords used for tag matching in the relevance score. */
+  tags: z.array(z.string().min(1).max(40)).max(20),
+  sourceFile: z.string().max(300).nullable(),
+  itemCount: z.number().int().min(0),
+  createdAt: timestampSchema,
+  updatedAt: timestampSchema,
+});
+export type Wordlist = z.infer<typeof wordlistSchema>;
+
+/**
+ * One import or export run (v0.2 §F4). `fileHash` is the idempotency key for
+ * imports: the same file imported twice adds zero rows and is reported as a
+ * duplicate instead. Exports record metadata only, never content.
+ */
+export const importExportHistorySchema = z.object({
+  id: idSchema,
+  learnerId: idSchema,
+  type: operationTypeSchema,
+  method: knowledgeEntryMethodSchema,
+  /** File name, wordlist name or paste title. */
+  sourceLabel: z.string().min(1).max(300),
+  /** SHA-256 hex of the uploaded bytes. Null for exports and pastes. */
+  fileHash: z.string().max(128).nullable(),
+  format: z.string().min(1).max(20),
+  totalCount: z.number().int().min(0),
+  addedCount: z.number().int().min(0),
+  duplicateCount: z.number().int().min(0),
+  failedCount: z.number().int().min(0),
+  status: operationStatusSchema,
+  /** Per-row failures, capped so one bad file cannot bloat the table. */
+  errors: z.array(z.object({ row: z.number().int().min(0), reason: z.string().max(300) })).max(50),
+  wordlistId: idSchema.nullable(),
+  goalId: idSchema.nullable(),
+  createdAt: timestampSchema,
+});
+export type ImportExportHistory = z.infer<typeof importExportHistorySchema>;
+
+/**
+ * Data-management audit trail (v0.2 §F5).
+ *
+ * Deliberately separate from `LearningEvent`: an event is an immutable fact
+ * about learning and the only input to the Learner Model, while this log
+ * records what was done to the library. Mixing them would let a bulk import
+ * pollute the learner's evidence.
+ */
+export const knowledgeOperationLogSchema = z.object({
+  id: idSchema,
+  learnerId: idSchema,
+  operation: knowledgeOperationTypeSchema,
+  /** Null for library-wide operations such as an export. */
+  knowledgeItemId: idSchema.nullable(),
+  /** Snapshot of the text at the time of the operation, for readability. */
+  itemText: z.string().max(400).nullable(),
+  /** Only the fields that changed, e.g. `{ status: ['new', 'active'] }`. */
+  changes: z.record(z.unknown()),
+  source: knowledgeEntryMethodSchema,
+  note: z.string().max(500).nullable(),
+  createdAt: timestampSchema,
+});
+export type KnowledgeOperationLog = z.infer<typeof knowledgeOperationLogSchema>;
 
 export const userFeedbackSchema = z.object({
   kind: feedbackKindSchema,

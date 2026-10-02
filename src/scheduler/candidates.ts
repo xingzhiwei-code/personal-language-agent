@@ -33,7 +33,7 @@ export function buildCandidates(snapshot: SchedulerSnapshot): Candidate[] {
       maxItems: snapshot.knowledgeCount,
       requiresAi: false,
       skills: ['vocabulary'],
-      subjectIds: dueIds,
+      subjectIds: snapshot.knowledgeItemIds,
       friction: 0.2,
       reasonHints: ['主动回忆比重复认读更能形成长期记忆'],
     });
@@ -48,7 +48,7 @@ export function buildCandidates(snapshot: SchedulerSnapshot): Candidate[] {
       maxItems: snapshot.sentenceCount,
       requiresAi: false,
       skills: ['reading', 'vocabulary'],
-      subjectIds: [],
+      subjectIds: snapshot.sentenceItemIds,
       friction: 0.15,
       reasonHints: ['在真实句子里再遇到这些表达'],
     });
@@ -63,7 +63,7 @@ export function buildCandidates(snapshot: SchedulerSnapshot): Candidate[] {
       maxItems: snapshot.grammarItemCount,
       requiresAi: false,
       skills: ['grammar'],
-      subjectIds: [],
+      subjectIds: snapshot.grammarItemIds,
       friction: 0.25,
       reasonHints: ['针对你记录的语法点做定向练习'],
     });
@@ -92,7 +92,7 @@ export function buildCandidates(snapshot: SchedulerSnapshot): Candidate[] {
         maxItems: 4,
         requiresAi: true,
         skills: ['writing'],
-        subjectIds: dueIds,
+        subjectIds: snapshot.knowledgeItemIds,
         friction: 0.5,
         reasonHints: ['写出来最能暴露真实的产出差距'],
       });

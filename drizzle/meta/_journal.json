@@ -8,6 +8,13 @@
       "when": 1790694543027,
       "tag": "0000_init",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1790946234360,
+      "tag": "0001_nosy_deadpool",
+      "breakpoints": true
     }
   ]
 }

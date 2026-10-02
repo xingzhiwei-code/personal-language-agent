@@ -52,13 +52,31 @@ export const knowledgeRelationTypeSchema = z.enum([
 ]);
 export type KnowledgeRelationType = z.infer<typeof knowledgeRelationTypeSchema>;
 
+/**
+ * Knowledge lifecycle (v0.2 §F6).
+ *
+ * `new`      — in the import pool: stored but deliberately NOT in the SRS due
+ *              queue. Nothing is scheduled until the learner (or the daily
+ *              budget) promotes it.
+ * `active`   — in study: eligible for review scheduling and recommendations.
+ * `user_mastered` — the learner declared it known; leaves daily rotation.
+ * `irrelevant`    — wrong detection / not wanted; never scheduled.
+ * `archived`      — soft-removed.
+ *
+ * The pool/study split is what stops an import of 4000 words from dumping 4000
+ * items into tomorrow's review queue.
+ */
 export const knowledgeStatusSchema = z.enum([
+  'new',
   'active',
   'user_mastered',
   'irrelevant',
   'archived',
 ]);
 export type KnowledgeStatus = z.infer<typeof knowledgeStatusSchema>;
+
+/** Statuses that may enter the SRS queue and recommendation candidates. */
+export const SCHEDULABLE_KNOWLEDGE_STATUSES = ['active'] as const satisfies readonly KnowledgeStatus[];
 
 /**
  * Provenance of language material. AI-generated content must never be
@@ -140,6 +158,12 @@ export type ActivityItemStatus = z.infer<typeof activityItemStatusSchema>;
 export const eventTypeSchema = z.enum([
   'goal_created',
   'goal_updated',
+  'goal_primary_changed',
+  'scenario_created',
+  'scenario_updated',
+  'scenario_archived',
+  'knowledge_imported',
+  'knowledge_pool_promoted',
   'session_created',
   'session_started',
   'session_paused',
@@ -163,6 +187,83 @@ export type EventType = z.infer<typeof eventTypeSchema>;
 
 export const eventSourceSchema = z.enum(['user', 'agent', 'system', 'import']);
 export type EventSource = z.infer<typeof eventSourceSchema>;
+
+/**
+ * Goal priority (v0.2 §F7). Exactly one goal may be primary at a time;
+ * everything else is secondary. Multi-goal without a primary dilutes
+ * recommendations, which is the problem this design exists to solve.
+ *
+ * The single source of truth is the existing pair on the goal row:
+ * `isPrimary` (boolean) plus the numeric `priority` used by the scheduler.
+ * There is deliberately no second enum, so the two can never disagree.
+ */
+export const MAX_GOAL_PRIORITY = 5;
+export const PRIMARY_GOAL_PRIORITY = 1;
+
+/**
+ * Display-level label for a goal, derived from `isPrimary`. Not persisted, so
+ * it can never drift from the boolean it describes.
+ */
+export const goalPrioritySchema = z.enum(['primary', 'secondary']);
+export type GoalPriority = z.infer<typeof goalPrioritySchema>;
+
+export const goalPriorityOf = (isPrimary: boolean): GoalPriority =>
+  isPrimary ? 'primary' : 'secondary';
+
+/** How a knowledge item entered the library (v0.2 §F4). */
+export const knowledgeEntryMethodSchema = z.enum([
+  'manual',
+  'file_upload',
+  'paste',
+  'export_restore',
+]);
+export type KnowledgeEntryMethod = z.infer<typeof knowledgeEntryMethodSchema>;
+
+/** Outcome of one import/export run. */
+export const operationStatusSchema = z.enum(['success', 'partial', 'failed']);
+export type OperationStatus = z.infer<typeof operationStatusSchema>;
+
+export const operationTypeSchema = z.enum(['import', 'export']);
+export type OperationType = z.infer<typeof operationTypeSchema>;
+
+/**
+ * Structure of a scenario (v0.2 §F7): a big scenario may contain small ones.
+ * Only the user declares scenarios in v0.2 — the system never infers one
+ * silently.
+ */
+export const scenarioTypeSchema = z.enum(['big', 'small']);
+export type ScenarioType = z.infer<typeof scenarioTypeSchema>;
+
+export const scenarioStatusSchema = z.enum(['active', 'done']);
+export type ScenarioStatus = z.infer<typeof scenarioStatusSchema>;
+
+/**
+ * Deterministic time horizon for a scenario. Stored as a preset (not free text)
+ * so "expired? -> archive" is a pure rule and never needs an LLM to parse
+ * "下周" (v0.2 §F7 生命周期).
+ */
+export const timeContextPresetSchema = z.enum([
+  'today',
+  'this_week',
+  'next_week',
+  'this_month',
+  'this_quarter',
+  'long_term',
+]);
+export type TimeContextPreset = z.infer<typeof timeContextPresetSchema>;
+
+/** Action recorded in the knowledge operation log (v0.2 §F5). */
+export const knowledgeOperationTypeSchema = z.enum([
+  'create',
+  'update',
+  'delete',
+  'promote_to_learning',
+  'pause_to_pool',
+  'import',
+  'export',
+  'goal_binding_changed',
+]);
+export type KnowledgeOperationType = z.infer<typeof knowledgeOperationTypeSchema>;
 
 export const intentSchema = z.enum([
   'learning',

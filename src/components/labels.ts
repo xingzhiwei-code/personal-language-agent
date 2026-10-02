@@ -80,6 +80,7 @@ export const SOURCE_LABELS: Record<SourceType, string> = {
 };
 
 export const STATUS_LABELS: Record<KnowledgeStatus, string> = {
+  new: '词库池',
   active: '学习中',
   user_mastered: '我已掌握',
   irrelevant: '不相关',

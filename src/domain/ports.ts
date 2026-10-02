@@ -4,7 +4,9 @@ import type {
   Content,
   ContentSource,
   Goal,
+  ImportExportHistory,
   KnowledgeItem,
+  KnowledgeOperationLog,
   KnowledgeRelation,
   LearnerState,
   LearningActivity,
@@ -14,9 +16,11 @@ import type {
   LearningTarget,
   Memory,
   Recommendation,
+  Scenario,
   TransferEvidence,
   User,
   UserContext,
+  Wordlist,
 } from './entities';
 import type {
   ActivityType,
@@ -62,7 +66,11 @@ export interface UserRepository {
 
 export interface GoalRepository {
   create(goal: Goal): Promise<Goal>;
+  /** Clears the previous primary and inserts this goal in one transaction. */
+  createAsPrimary(goal: Goal): Promise<Goal>;
   update(goal: Goal): Promise<Goal>;
+  /** Clears the previous primary and updates this goal in one transaction. */
+  setPrimary(goal: Goal): Promise<Goal>;
   findById(id: string): Promise<Goal | null>;
   listByLearner(learnerId: string, statuses?: Goal['status'][]): Promise<Goal[]>;
   findPrimary(learnerId: string): Promise<Goal | null>;
@@ -89,6 +97,7 @@ export interface KnowledgeSearchQuery {
   types?: KnowledgeType[];
   statuses?: KnowledgeStatus[];
   tags?: string[];
+  wordlistIds?: string[];
   limit?: number;
   offset?: number;
 }
@@ -104,6 +113,13 @@ export interface KnowledgeRepository {
     type: KnowledgeType,
     normalizedText: string,
   ): Promise<KnowledgeItem | null>;
+  findAnyByNormalized(
+    learnerId: string,
+    languageCode: string,
+    normalizedText: string,
+  ): Promise<KnowledgeItem | null>;
+  /** Used by import preview for deterministic, type-independent de-duplication. */
+  listNormalizedByLanguage(learnerId: string, languageCode: string): Promise<string[]>;
   search(query: KnowledgeSearchQuery): Promise<KnowledgeItem[]>;
   count(query: KnowledgeSearchQuery): Promise<number>;
   listByIds(ids: string[]): Promise<KnowledgeItem[]>;
@@ -129,6 +145,11 @@ export interface LearnerStateRepository {
   ): Promise<LearnerState | null>;
   upsert(state: LearnerState): Promise<LearnerState>;
   listBySubjectType(learnerId: string, subjectType: SubjectType): Promise<LearnerState[]>;
+  listBySubjectIds(
+    learnerId: string,
+    subjectType: SubjectType,
+    subjectIds: string[],
+  ): Promise<LearnerState[]>;
   listDueForReview(learnerId: string, nowIso: string, limit: number): Promise<LearnerState[]>;
   listWeakest(learnerId: string, subjectType: SubjectType, limit: number): Promise<LearnerState[]>;
   listByLearner(learnerId: string): Promise<LearnerState[]>;
@@ -166,6 +187,15 @@ export interface SessionRepository {
     statuses?: SessionStatus[],
   ): Promise<LearningSession[]>;
   listRecentActivityTypes(learnerId: string, limit: number): Promise<ActivityType[]>;
+}
+
+export interface SessionStartRepository {
+  commit(input: {
+    session: LearningSession;
+    activities: LearningActivity[];
+    events: LearningEvent[];
+    recommendationId: string | null;
+  }): Promise<{ session: LearningSession; activities: LearningActivity[]; created: boolean } | null>;
 }
 
 export interface ActivityRepository {
@@ -224,6 +254,119 @@ export interface ContentRepository {
   listSourcesByLearner(learnerId: string, limit: number): Promise<ContentSource[]>;
 }
 
+// ── v0.2 repositories ─────────────────────────────────────────────────────────
+
+export interface WordlistRepository {
+  create(wordlist: Wordlist): Promise<Wordlist>;
+  update(wordlist: Wordlist): Promise<Wordlist>;
+  findById(id: string): Promise<Wordlist | null>;
+  listByLearner(learnerId: string): Promise<Wordlist[]>;
+  delete(id: string): Promise<void>;
+}
+
+export interface ImportExportHistoryRepository {
+  create(record: ImportExportHistory): Promise<ImportExportHistory>;
+  update(record: ImportExportHistory): Promise<ImportExportHistory>;
+  findById(id: string): Promise<ImportExportHistory | null>;
+  /** Idempotency check: has this file hash already been imported by this learner? */
+  findByFileHash(learnerId: string, fileHash: string): Promise<ImportExportHistory | null>;
+  listByLearner(learnerId: string, limit: number): Promise<ImportExportHistory[]>;
+}
+
+export interface KnowledgeOperationLogRepository {
+  append(entry: KnowledgeOperationLog): Promise<KnowledgeOperationLog>;
+  listByLearner(
+    learnerId: string,
+    limit: number,
+    offset?: number,
+    operations?: KnowledgeOperationLog['operation'][],
+  ): Promise<KnowledgeOperationLog[]>;
+  listByItem(learnerId: string, knowledgeItemId: string, limit: number): Promise<KnowledgeOperationLog[]>;
+  countByLearner(learnerId: string): Promise<number>;
+}
+
+export interface ScenarioRepository {
+  create(scenario: Scenario): Promise<Scenario>;
+  update(scenario: Scenario): Promise<Scenario>;
+  findById(id: string): Promise<Scenario | null>;
+  listByLearner(learnerId: string, statuses?: Scenario['status'][]): Promise<Scenario[]>;
+  listByGoal(goalId: string): Promise<Scenario[]>;
+  /** Archives scenarios whose resolvedDueAt has passed. Returns the count archived. */
+  archiveExpired(learnerId: string, nowIso: string): Promise<number>;
+  delete(id: string): Promise<void>;
+}
+
+export interface FileImportBatch {
+  wordlist: Wordlist;
+  history: ImportExportHistory;
+  items: KnowledgeItem[];
+  states: LearnerState[];
+  logs: KnowledgeOperationLog[];
+}
+
+export interface FileImportCommitResult {
+  duplicateFile: boolean;
+  history: ImportExportHistory;
+  wordlist: Wordlist | null;
+  insertedItems: KnowledgeItem[];
+}
+
+export interface PoolPromotionBatch {
+  learnerId: string;
+  itemIds: string[];
+  states: LearnerState[];
+  logs: KnowledgeOperationLog[];
+  event: LearningEvent;
+  automaticBudget?: { dayKey: string; budget: number };
+}
+
+export interface KnowledgePoolRepository {
+  /** Atomically promotes only items still in the pool and writes state/log/event. */
+  promote(batch: PoolPromotionBatch): Promise<KnowledgeItem[]>;
+  /** Atomically moves active items to the pool and removes them from due scheduling. */
+  pause(input: {
+    learnerId: string;
+    itemIds: string[];
+    nowIso: string;
+    logs: KnowledgeOperationLog[];
+  }): Promise<KnowledgeItem[]>;
+}
+
+/** Atomic persistence boundary for one file import. */
+export interface FileImportRepository {
+  commit(batch: FileImportBatch): Promise<FileImportCommitResult>;
+}
+
+export interface LearnerDataSnapshot {
+  user: unknown;
+  goals: unknown[];
+  learningTargets: unknown[];
+  knowledgeItems: unknown[];
+  knowledgeRelations: unknown[];
+  learnerStates: unknown[];
+  learningSessions: unknown[];
+  learningActivities: unknown[];
+  assessments: unknown[];
+  learningEvents: unknown[];
+  chatMessages: unknown[];
+  memories: unknown[];
+  preferences: unknown[];
+  userContexts: unknown[];
+  recommendations: unknown[];
+  transferEvidence: unknown[];
+  contentSources: unknown[];
+  contents: unknown[];
+  wordlists: unknown[];
+  importExportHistory: unknown[];
+  knowledgeOperationLog: unknown[];
+  scenarios: unknown[];
+}
+
+export interface LearnerDataExportRepository {
+  /** Returns every row for the learner without silent pagination limits. */
+  exportAll(learnerId: string): Promise<LearnerDataSnapshot>;
+}
+
 /** Whole-unit-of-work handle passed to application services. */
 export interface Repositories {
   users: UserRepository;
@@ -235,6 +378,7 @@ export interface Repositories {
   events: EventRepository;
   assessments: AssessmentRepository;
   sessions: SessionRepository;
+  sessionStarts: SessionStartRepository;
   activities: ActivityRepository;
   chat: ChatMessageRepository;
   memories: MemoryRepository;
@@ -243,6 +387,14 @@ export interface Repositories {
   recommendations: RecommendationRepository;
   transfer: TransferEvidenceRepository;
   content: ContentRepository;
+  // v0.2
+  wordlists: WordlistRepository;
+  importExportHistory: ImportExportHistoryRepository;
+  operationLog: KnowledgeOperationLogRepository;
+  scenarios: ScenarioRepository;
+  fileImports: FileImportRepository;
+  knowledgePool: KnowledgePoolRepository;
+  dataExport: LearnerDataExportRepository;
   /** Deletes every row belonging to a learner (data deletion feature). */
   deleteAllForLearner(learnerId: string): Promise<void>;
 }

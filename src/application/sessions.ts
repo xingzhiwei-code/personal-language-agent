@@ -3,6 +3,7 @@ import type {
   KnowledgeItem,
   LearnerState,
   LearningActivity,
+  LearningEvent,
   LearningSession,
   SessionSummary,
 } from '@/domain/entities';
@@ -19,7 +20,7 @@ import {
 import { buildReviewItems, type ReviewItemSpec } from '@/assessment/review-items';
 import { submitAssessment } from './assessment';
 import { appendEvent } from './events';
-import { buildSchedulerSnapshot, markRecommendationAccepted } from './recommendations';
+import { buildSchedulerSnapshot } from './recommendations';
 import type { AppContext } from './types';
 
 export interface StartSessionInput {
@@ -73,9 +74,28 @@ export async function startSession(
     };
   }
 
+  const recommendation = input.recommendationId
+    ? await ctx.repos.recommendations.findById(input.recommendationId)
+    : null;
+  if (
+    input.recommendationId &&
+    (!recommendation ||
+      recommendation.learnerId !== input.learnerId ||
+      recommendation.status !== 'offered')
+  ) {
+    throw notFound('Recommendation', input.recommendationId);
+  }
+  if (recommendation && recommendation.activityType !== input.activityType) {
+    throw validationFailed('推荐活动类型不匹配');
+  }
   const now = ctx.clock.nowIso();
   const goalId =
-    input.goalId ?? (await ctx.repos.goals.findPrimary(input.learnerId))?.id ?? null;
+    recommendation?.goalId ??
+    input.goalId ??
+    (await ctx.repos.goals.findPrimary(input.learnerId))?.id ??
+    null;
+  const plannedDurationMinutes =
+    recommendation?.plannedDurationMinutes ?? input.plannedDurationMinutes ?? null;
 
   const session: LearningSession = {
     id: ctx.ids.next(),
@@ -84,7 +104,7 @@ export async function startSession(
     recommendationId: input.recommendationId ?? null,
     activityType: input.activityType,
     status: 'active',
-    plannedDurationMinutes: input.plannedDurationMinutes ?? null,
+    plannedDurationMinutes,
     correctionEnabled: input.correctionEnabled ?? true,
     startedAt: now,
     lastActiveAt: now,
@@ -95,18 +115,22 @@ export async function startSession(
     createdAt: now,
     updatedAt: now,
   };
-  await ctx.repos.sessions.create(session);
 
   const itemLimit =
+    recommendation?.estimatedItemCount ??
     input.itemLimit ??
     Math.max(
       1,
-      Math.round(
-        (input.plannedDurationMinutes ?? 5) * (ITEMS_PER_MINUTE[input.activityType] || 0),
-      ),
+      Math.round((plannedDurationMinutes ?? 5) * (ITEMS_PER_MINUTE[input.activityType] || 0)),
     );
 
-  const specs = await planActivities(ctx, input.learnerId, input.activityType, itemLimit);
+  const specs = await planActivities(
+    ctx,
+    input.learnerId,
+    input.activityType,
+    itemLimit,
+    recommendation?.subjectIds ?? [],
+  );
   const activities: LearningActivity[] = specs.map((spec, index) => ({
     id: ctx.ids.next(),
     sessionId: session.id,
@@ -124,26 +148,46 @@ export async function startSession(
     createdAt: now,
     updatedAt: now,
   }));
-  await ctx.repos.activities.createMany(activities);
-
-  await appendEvent(ctx, {
-    learnerId: input.learnerId,
-    type: 'session_started',
-    source: 'user',
-    sessionId: session.id,
-    idempotencyKey: `session-started:${session.id}`,
-    payload: {
-      activityType: input.activityType,
-      plannedDurationMinutes: session.plannedDurationMinutes,
-      itemCount: activities.length,
+  const events: LearningEvent[] = [
+    {
+      id: ctx.ids.next(),
+      learnerId: input.learnerId,
+      sessionId: session.id,
+      type: 'session_started',
+      occurredAt: now,
+      payload: {
+        activityType: input.activityType,
+        plannedDurationMinutes: session.plannedDurationMinutes,
+        itemCount: activities.length,
+      },
+      source: 'user',
+      version: 1,
+      idempotencyKey: `session-started:${session.id}`,
+      createdAt: now,
     },
-  });
-
-  if (input.recommendationId) {
-    await markRecommendationAccepted(ctx, input.learnerId, input.recommendationId);
+  ];
+  if (recommendation) {
+    events.push({
+      id: ctx.ids.next(),
+      learnerId: input.learnerId,
+      sessionId: session.id,
+      type: 'recommendation_accepted',
+      occurredAt: now,
+      payload: { recommendationId: recommendation.id, activityType: recommendation.activityType },
+      source: 'user',
+      version: 1,
+      idempotencyKey: `recommendation-accepted:${recommendation.id}`,
+      createdAt: now,
+    });
   }
-
-  return { session, activities, created: true };
+  const committed = await ctx.repos.sessionStarts.commit({
+    session,
+    activities,
+    events,
+    recommendationId: recommendation?.id ?? null,
+  });
+  if (!committed) throw validationFailed('这个推荐已经开始或失效，请刷新首页');
+  return committed;
 }
 
 /** Chooses the concrete items for an activity type — deterministic selection. */
@@ -152,6 +196,7 @@ async function planActivities(
   learnerId: string,
   activityType: ActivityType,
   itemLimit: number,
+  preferredSubjectIds: string[] = [],
 ): Promise<ReviewItemSpec[]> {
   if (activityType === 'conversation' || activityType === 'listening' || activityType === 'pronunciation') {
     return [];
@@ -196,6 +241,7 @@ async function planActivities(
     default:
       entries = practicePool;
   }
+  entries = prioritizeEntries(entries, preferredSubjectIds);
 
   if (activityType === 'writing') {
     // Production practice: use the expression in a sentence of your own.
@@ -216,6 +262,22 @@ async function planActivities(
     limit: itemLimit,
     // Stable per learner+day so a reload does not reshuffle the question set.
     seed: hashSeed(`${learnerId}:${ctx.clock.nowIso().slice(0, 10)}:${activityType}`),
+  });
+}
+
+function prioritizeEntries<T extends { item: KnowledgeItem }>(
+  entries: T[],
+  preferredSubjectIds: string[],
+): T[] {
+  if (preferredSubjectIds.length === 0) return entries;
+  const order = new Map(preferredSubjectIds.map((id, index) => [id, index]));
+  return [...entries].sort((a, b) => {
+    const aOrder = order.get(a.item.id);
+    const bOrder = order.get(b.item.id);
+    if (aOrder !== undefined && bOrder !== undefined) return aOrder - bOrder;
+    if (aOrder !== undefined) return -1;
+    if (bOrder !== undefined) return 1;
+    return 0;
   });
 }
 

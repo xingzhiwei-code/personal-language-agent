@@ -6,6 +6,7 @@ import type { SelfRating } from '@/assessment/grading';
 import { correctAssessment } from '@/application/assessment';
 import { captureContext } from '@/application/context';
 import { recordFeedback } from '@/application/feedback';
+import { replaceDailyPlan, restDailyPlan, resumeDailyPlan } from '@/application/daily-plan';
 import { createGoalFromText, updateGoal } from '@/application/goals';
 import {
   abandonSession,
@@ -17,7 +18,12 @@ import {
   submitActivityAnswer,
 } from '@/application/sessions';
 import { rejectRecommendation } from '@/application/recommendations';
-import type { ActivityType, FeedbackKind, GoalStatus } from '@/domain/enums';
+import {
+  activityTypeSchema,
+  goalStatusSchema,
+  type FeedbackKind,
+} from '@/domain/enums';
+import { validationFailed } from '@/domain/errors';
 import {
   app,
   toActionError,
@@ -55,11 +61,14 @@ export async function updateGoalAction(
 ): Promise<ActionResult> {
   const { ctx, learnerId } = app();
   try {
+    const statusRaw = formData.get('status');
+    const status = statusRaw ? goalStatusSchema.safeParse(String(statusRaw)) : null;
+    if (status && !status.success) throw validationFailed('目标状态无效');
     await updateGoal(ctx, {
       learnerId,
       goalId: String(formData.get('goalId') ?? ''),
       title: formData.get('title') ? String(formData.get('title')) : undefined,
-      status: formData.get('status') ? (String(formData.get('status')) as GoalStatus) : undefined,
+      status: status?.data,
       makePrimary: formData.get('makePrimary') === 'on' ? true : undefined,
     });
     revalidatePath('/');
@@ -106,7 +115,11 @@ function buildContextMessage(intent: string, minutes: number | null): string {
 
 export async function startSessionAction(formData: FormData): Promise<void> {
   const { ctx, learnerId } = app();
-  const activityType = String(formData.get('activityType') ?? 'quick_review') as ActivityType;
+  const parsedActivityType = activityTypeSchema.safeParse(
+    String(formData.get('activityType') ?? 'quick_review'),
+  );
+  if (!parsedActivityType.success) throw validationFailed('学习活动类型无效');
+  const activityType = parsedActivityType.data;
   const minutesRaw = String(formData.get('minutes') ?? '');
   const minutes = Number.parseInt(minutesRaw, 10);
   const recommendationId = formData.get('recommendationId')
@@ -210,6 +223,28 @@ export async function completeSessionAction(formData: FormData): Promise<void> {
 export async function rejectRecommendationAction(formData: FormData): Promise<void> {
   const { ctx, learnerId } = app();
   await rejectRecommendation(ctx, learnerId, String(formData.get('recommendationId') ?? ''));
+  revalidatePath('/');
+}
+
+export async function replaceDailyPlanAction(formData: FormData): Promise<void> {
+  const { ctx, learnerId } = app();
+  await replaceDailyPlan(
+    ctx,
+    learnerId,
+    formData.getAll('recommendationId').map(String),
+  );
+  revalidatePath('/');
+}
+
+export async function restDailyPlanAction(): Promise<void> {
+  const { ctx, learnerId } = app();
+  await restDailyPlan(ctx, learnerId);
+  revalidatePath('/');
+}
+
+export async function resumeDailyPlanAction(): Promise<void> {
+  const { ctx, learnerId } = app();
+  await resumeDailyPlan(ctx, learnerId);
   revalidatePath('/');
 }
 

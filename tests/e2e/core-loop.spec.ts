@@ -300,3 +300,162 @@ test('数据导出与删除', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('heading', { name: '先说一句你想达到什么' })).toBeVisible();
 });
+
+test('文件导入：预览确认后进入词库池，同一文件不可重复导入', async ({ page }) => {
+  const upload = {
+    name: 'e2e-wordlist.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from(
+      'word,phonetic,pos,definition,example\ne2e-alpha,,n.,测试甲,An alpha example.\ne2e-beta,,n.,测试乙,',
+      'utf8',
+    ),
+  };
+
+  await page.goto('/knowledge/import');
+  await page.getByLabel('词库文件').setInputFiles(upload);
+  await page.getByRole('button', { name: '解析并预览' }).click();
+  await expect(page.getByRole('heading', { name: /预览：e2e-wordlist.csv/ })).toBeVisible();
+  await expect(page.getByText(/预计新增 2 条/)).toBeVisible();
+  await page.getByLabel('词库名称').fill('E2E 测试词库');
+  await page.getByRole('button', { name: '确认导入词库池' }).click();
+  await expect(page.getByRole('heading', { name: '导入完成' })).toBeVisible();
+  await expect(page.getByText(/新增 2 条，重复跳过 0 条/)).toBeVisible();
+
+  await page.getByRole('link', { name: '查看词库池' }).click();
+  await expect(page.getByText('e2e-alpha')).toBeVisible();
+  await expect(page.getByText('e2e-beta')).toBeVisible();
+
+  const jsonDownload = page.waitForEvent('download');
+  await page.getByRole('link', { name: '导出 JSON' }).click();
+  expect((await jsonDownload).suggestedFilename()).toMatch(/^knowledge-.*\.json$/);
+  const csvDownload = page.waitForEvent('download');
+  await page.getByRole('link', { name: '导出 CSV' }).click();
+  expect((await csvDownload).suggestedFilename()).toMatch(/^knowledge-.*\.csv$/);
+
+  await page.goto('/knowledge/import');
+  await page.getByLabel('词库文件').setInputFiles(upload);
+  await page.getByRole('button', { name: '解析并预览' }).click();
+  await expect(page.getByText('文件哈希与已有导入记录一致。为保证幂等，本次不会写入任何数据。')).toBeVisible();
+  await expect(page.getByRole('button', { name: '确认导入词库池' })).toHaveCount(0);
+
+  await page.goto('/knowledge/history');
+  await expect(page.getByText('e2e-wordlist.csv')).toBeVisible();
+  await expect(page.getByText(/总计 2 · 新增 2 · 重复 0 · 失败 0/)).toBeVisible();
+
+  await page.goto('/knowledge/logs?type=import');
+  await expect(page.getByText('e2e-alpha')).toBeVisible();
+  await expect(page.getByText('e2e-beta')).toBeVisible();
+  await expect(page.getByText('文件导入').first()).toBeVisible();
+});
+
+test('无 Key 文本导入：原文仍可保存且不产生盲目入库', async ({ page }) => {
+  await page.goto('/knowledge/import/paste');
+  await expect(page.getByText(/当前没有配置 AI/)).toBeVisible();
+  await page.getByLabel('标题（可选）').fill('无 Key 演讲稿');
+  await page.getByLabel('文本或字幕').fill('This is a short speech with a useful expression to figure out later.');
+  await page.getByRole('button', { name: '保存原文' }).click();
+  await expect(page.getByRole('heading', { name: '原文已保存' })).toBeVisible();
+  await expect(page.getByText(/你仍可从知识库手动添加表达/)).toBeVisible();
+  await expect(page.getByRole('button', { name: /确认导入/ })).toHaveCount(0);
+  await page.getByRole('link', { name: '查看原文并手动摘录' }).click();
+  await expect(page.getByText('This is a short speech with a useful expression to figure out later.')).toBeVisible();
+  await expect(page.getByRole('button', { name: '从原文添加表达' })).toBeVisible();
+
+  await page.goto('/knowledge/history');
+  await expect(page.getByText('无 Key 演讲稿')).toBeVisible();
+  await expect(page.getByText('部分成功').first()).toBeVisible();
+});
+
+test('多目标主次切换、词库绑定与树形场景管理', async ({ page }) => {
+  await page.goto('/knowledge/import');
+  await page.getByLabel('词库文件').setInputFiles({
+    name: 'm6-wordlist.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from('word,definition\nagenda,议程', 'utf8'),
+  });
+  await page.getByRole('button', { name: '解析并预览' }).click();
+  await page.getByLabel('词库名称').fill('商务会议词库');
+  await page.getByRole('button', { name: '确认导入词库池' }).click();
+  await expect(page.getByRole('heading', { name: '导入完成' })).toBeVisible();
+
+  await page.goto('/goals');
+  await page.getByLabel('你想达到什么？').fill('我要准备雅思考试');
+  await page.getByTestId('create-goal').click();
+  await expect(page.getByText('我要准备雅思考试').first()).toBeVisible();
+
+  await page.getByLabel('你想达到什么？').fill('我要提高商务英语口语');
+  await page.getByTestId('create-goal').click();
+  await expect(page.getByText('我要提高商务英语口语').first()).toBeVisible();
+  const primaryToggle = page.getByLabel('设为主要');
+  await primaryToggle.check();
+  await primaryToggle.locator('xpath=ancestor::form').getByRole('button', { name: '更新' }).click();
+  await expect(page.getByText('主要目标')).toHaveCount(1);
+
+  const wordlistForm = page.locator('form').filter({ hasText: '商务会议词库' });
+  const serviceGoal = wordlistForm.getByLabel('服务目标');
+  await serviceGoal.selectOption({ label: '主攻 · 我要提高商务英语口语' });
+  await wordlistForm.getByRole('button', { name: '保存' }).click();
+
+  await page.getByLabel('场景名称').fill('下周出国旅行');
+  await page.getByLabel('时间范围').selectOption('next_week');
+  await page.getByLabel('绑定目标（可选）').selectOption({ label: '主攻 · 我要提高商务英语口语' });
+  await page.getByRole('button', { name: '创建场景' }).click();
+  await expect(page.getByText('场景已创建')).toBeVisible();
+  await expect(page.locator('input[name="name"][value="下周出国旅行"]')).toBeVisible();
+
+  await page.getByLabel('场景名称').fill('饭店点餐');
+  await page.getByLabel('类型').selectOption('small');
+  await page.getByLabel('所属大场景').selectOption({ label: '下周出国旅行' });
+  await page.getByRole('button', { name: '创建场景' }).click();
+  await expect(page.locator('input[name="name"][value="饭店点餐"]')).toBeVisible();
+});
+
+test('今日计划、预算、换批、休息与词库池手动流转', async ({ page }) => {
+  await page.goto('/');
+  if (await page.getByRole('heading', { name: '先说一句你想达到什么' }).count()) {
+    await page.getByLabel('你想达到什么？').fill('我要提高英语综合能力');
+    await page.getByTestId('create-goal').click();
+    await expect(page.getByText('当前主要目标')).toBeVisible();
+  }
+  await page.goto('/settings');
+  await page.getByRole('spinbutton', { name: /每天最多自动加入/ }).fill('2');
+  await page.getByRole('button', { name: '保存预算' }).click();
+  await expect(page.getByRole('status')).toContainText('每天最多自动加入 2 个新词');
+
+  await page.goto('/knowledge/import');
+  await page.getByLabel('词库文件').setInputFiles({
+    name: 'm7-plan.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from(
+      'word,definition,example\nm7-alpha,甲,An m7 alpha example.\nm7-beta,乙,An m7 beta example.\nm7-gamma,丙,An m7 gamma example.\nm7-delta,丁,An m7 delta example.',
+      'utf8',
+    ),
+  });
+  await page.getByRole('button', { name: '解析并预览' }).click();
+  await page.getByLabel('词库名称').fill('M7 今日计划词库');
+  await page.getByRole('button', { name: '确认导入词库池' }).click();
+  await expect(page.getByRole('heading', { name: '导入完成' })).toBeVisible();
+
+  await page.goto('/');
+  await expect(page.getByText('今日计划', { exact: true })).toBeVisible();
+  await expect(page.getByText(/约 \d+ 分钟 · \d+ 项任务/)).toBeVisible();
+  await page.getByRole('button', { name: '换一批' }).click();
+  await expect(page.getByText('今日计划', { exact: true })).toBeVisible();
+
+  await page.getByRole('button', { name: '今日休息' }).click();
+  await expect(page.getByRole('heading', { name: '今天已设为休息日' })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('heading', { name: '今天已设为休息日' })).toBeVisible();
+  await page.getByRole('button', { name: '恢复今日计划' }).click();
+  await expect(page.getByText('今日计划', { exact: true })).toBeVisible();
+
+  await page.goto('/knowledge?status=pool&wordlist=');
+  const firstPoolItem = page.getByRole('checkbox', { name: /^选择 / }).first();
+  await firstPoolItem.check();
+  await page.getByRole('button', { name: '加入学习' }).click();
+  await expect(page.getByRole('status')).toContainText('已将 1 条加入学习');
+
+  await page.goto('/');
+  await page.getByTestId('start-recommendation').click();
+  await expect(page).toHaveURL(/\/learn\//);
+});

@@ -3,6 +3,7 @@ import type { GoalStatus } from '@/domain/enums';
 import { notFound, validationFailed } from '@/domain/errors';
 import { createInitialState } from '@/learner/state';
 import { parseGoalInput } from '@/nlu/goal';
+import { recordKnowledgeOperation } from './audit';
 import { appendEvent } from './events';
 import { LOCAL_LEARNER_ID, type AppContext } from './types';
 
@@ -78,10 +79,6 @@ export async function createGoalFromText(
 
   const existingGoals = await ctx.repos.goals.listByLearner(input.learnerId, ['active']);
   const makePrimary = input.makePrimary ?? existingGoals.length === 0;
-  if (makePrimary) {
-    await ctx.repos.goals.clearPrimary(input.learnerId);
-  }
-
   const goal: Goal = {
     id: ctx.ids.next(),
     learnerId: input.learnerId,
@@ -96,7 +93,7 @@ export async function createGoalFromText(
     createdAt: now,
     updatedAt: now,
   };
-  await ctx.repos.goals.create(goal);
+  await (makePrimary ? ctx.repos.goals.createAsPrimary(goal) : ctx.repos.goals.create(goal));
 
   const targets: LearningTarget[] = parsed.skills.map((entry) => ({
     id: ctx.ids.next(),
@@ -140,6 +137,17 @@ export async function createGoalFromText(
       languageConfidence: parsed.languageConfidence,
     },
   });
+
+  await recordKnowledgeOperation(ctx, {
+    learnerId: input.learnerId,
+    operation: 'goal_binding_changed',
+    source: 'manual',
+    note: `创建目标：${goal.title}${goal.isPrimary ? '（主攻）' : '（次要）'}`,
+  });
+  await ctx.repos.recommendations.expireOffered(
+    input.learnerId,
+    new Date(Date.parse(now) + 1).toISOString(),
+  );
 
   if (parsed.availableMinutes || input.availableMinutes) {
     await ctx.repos.preferences.upsertByKey({
@@ -191,28 +199,58 @@ export async function updateGoal(ctx: AppContext, input: UpdateGoalInput): Promi
   }
 
   const now = ctx.clock.nowIso();
-  if (input.makePrimary) {
-    await ctx.repos.goals.clearPrimary(input.learnerId);
-  }
-
+  const nextStatus = input.makePrimary ? 'active' : input.status ?? goal.status;
+  const isPrimary = input.makePrimary ? true : nextStatus === 'active' ? goal.isPrimary : false;
   const updated: Goal = {
     ...goal,
     title: input.title?.trim() ?? goal.title,
     description: input.description === undefined ? goal.description : input.description,
     scenarios: input.scenarios ?? goal.scenarios,
-    status: input.status ?? goal.status,
-    isPrimary: input.makePrimary ?? (input.status === 'archived' ? false : goal.isPrimary),
+    status: nextStatus,
+    priority: isPrimary ? 1 : Math.max(2, goal.priority),
+    isPrimary,
     updatedAt: now,
   };
-  await ctx.repos.goals.update(updated);
+  await (input.makePrimary
+    ? ctx.repos.goals.setPrimary(updated)
+    : ctx.repos.goals.update(updated));
+
+  let promotedFallback: Goal | null = null;
+  if (goal.isPrimary && !updated.isPrimary) {
+    const activeGoals = await ctx.repos.goals.listByLearner(input.learnerId, ['active']);
+    const fallback = activeGoals.find((candidate) => candidate.id !== goal.id);
+    if (fallback) {
+      promotedFallback = { ...fallback, isPrimary: true, priority: 1, updatedAt: now };
+      await ctx.repos.goals.setPrimary(promotedFallback);
+    }
+  }
 
   await appendEvent(ctx, {
     learnerId: input.learnerId,
-    type: 'goal_updated',
+    type: input.makePrimary || promotedFallback ? 'goal_primary_changed' : 'goal_updated',
     source: 'user',
     idempotencyKey: `goal-updated:${goal.id}:${now}`,
-    payload: { goalId: goal.id, status: updated.status, isPrimary: updated.isPrimary },
+    payload: {
+      goalId: goal.id,
+      status: updated.status,
+      isPrimary: updated.isPrimary,
+      promotedGoalId: promotedFallback?.id ?? null,
+    },
   });
+  await recordKnowledgeOperation(ctx, {
+    learnerId: input.learnerId,
+    operation: 'goal_binding_changed',
+    source: 'manual',
+    note: input.makePrimary
+      ? `设为主攻目标：${updated.title}`
+      : promotedFallback
+        ? `${updated.title} 已暂停或归档，主攻目标切换为 ${promotedFallback.title}`
+        : `更新目标：${updated.title}`,
+  });
+  await ctx.repos.recommendations.expireOffered(
+    input.learnerId,
+    new Date(Date.parse(now) + 1).toISOString(),
+  );
 
   return updated;
 }

@@ -2,7 +2,8 @@
 
 import { revalidatePath } from 'next/cache';
 import { deleteLearnerData, saveExportToStorage } from '@/application/data-management';
-import { retireMemory } from '@/application/memory';
+import { setPreference, retireMemory } from '@/application/memory';
+import { MAX_DAILY_NEW_WORD_BUDGET } from '@/application/knowledge-pool';
 import { app, toActionError, type ActionResult } from '@/server/app';
 
 export async function saveExportAction(
@@ -34,6 +35,31 @@ export async function deleteDataAction(
     revalidatePath('/history');
     revalidatePath('/goals');
     return { ok: true, message: '本地学习数据已删除' };
+  } catch (error) {
+    return { ok: false, message: toActionError(error) };
+  }
+}
+
+export async function updateDailyNewWordBudgetAction(
+  _previous: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const raw = String(formData.get('budget') ?? '');
+  const budget = Number(raw);
+  if (!Number.isInteger(budget) || budget < 0 || budget > MAX_DAILY_NEW_WORD_BUDGET) {
+    return { ok: false, message: `每日新词预算必须是 0–${MAX_DAILY_NEW_WORD_BUDGET} 的整数` };
+  }
+  try {
+    const { ctx, learnerId } = app();
+    await setPreference(ctx, {
+      learnerId,
+      key: 'daily_new_word_budget',
+      value: String(budget),
+      source: 'user_explicit',
+    });
+    revalidatePath('/');
+    revalidatePath('/settings');
+    return { ok: true, message: budget === 0 ? '已关闭自动加入新词' : `每天最多自动加入 ${budget} 个新词` };
   } catch (error) {
     return { ok: false, message: toActionError(error) };
   }

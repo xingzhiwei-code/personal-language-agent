@@ -21,9 +21,11 @@ const TYPES: KnowledgeType[] = [
   'concept',
 ];
 
-const STATUSES: KnowledgeStatus[] = ['active', 'user_mastered', 'irrelevant', 'archived'];
+const LEARNING_STATUSES: KnowledgeStatus[] = ['active', 'user_mastered', 'irrelevant', 'archived'];
+const POOL_STATUSES: KnowledgeStatus[] = ['new', 'irrelevant', 'archived'];
 
 export function KnowledgeEditor({ item }: { item: KnowledgeItem }) {
+  const statuses = item.status === 'new' ? POOL_STATUSES : LEARNING_STATUSES;
   const router = useRouter();
   const [state, action, pending] = useActionState<ActionResult | null, FormData>(
     updateKnowledgeAction,
@@ -109,7 +111,7 @@ export function KnowledgeEditor({ item }: { item: KnowledgeItem }) {
           className="mt-1 rounded-xl border border-ink-200 px-3 py-2.5 text-sm"
           data-testid="edit-status"
         >
-          {STATUSES.map((status) => (
+          {statuses.map((status) => (
             <option key={status} value={status}>
               {STATUS_LABELS[status]}
             </option>

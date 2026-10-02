@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { deleteKnowledgeAction, removeRelationAction } from '@/app/actions/knowledge';
 import { getKnowledgeDetail, listKnowledge } from '@/application/knowledge';
 import { KnowledgeEditor } from '@/components/knowledge/KnowledgeEditor';
+import { KnowledgeFlowControls } from '@/components/knowledge/KnowledgeFlowControls';
 import { RelationForm } from '@/components/knowledge/RelationForm';
 import {
   KNOWLEDGE_TYPE_LABELS,
@@ -119,6 +120,7 @@ export default async function KnowledgeDetailPage({
 
       <Card>
         <SectionTitle title="内容" />
+        <KnowledgeFlowControls id={item.id} status={item.status} />
         <KnowledgeEditor item={item} />
       </Card>
 

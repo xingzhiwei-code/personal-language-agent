@@ -14,6 +14,7 @@ import type {
 import { notFound, validationFailed } from '@/domain/errors';
 import { classifyKnowledgeText, normalizeKnowledgeText } from '@/language/registry';
 import { createInitialState } from '@/learner/state';
+import { recordKnowledgeOperation } from './audit';
 import { appendEvent } from './events';
 import type { AppContext } from './types';
 
@@ -31,6 +32,14 @@ export interface CreateKnowledgeInput {
   sourceRef?: string | null;
   sourceId?: string | null;
   aiGenerated?: boolean;
+  /** If true, item enters with status='new' (pool), not 'active' (learning). */
+  poolMode?: boolean;
+  /** Wordlist this item belongs to (v0.2 §F1). */
+  wordlistId?: string | null;
+  /** Normalised frequency rank 0..1 within the import batch. */
+  frequencyRank?: number | null;
+  /** How this item entered the library. Defaults to 'manual'. */
+  entryMethod?: import('@/domain/enums').KnowledgeEntryMethod;
 }
 
 export interface CreateKnowledgeResult {
@@ -60,28 +69,61 @@ export async function createKnowledgeItem(
   const normalizedText = normalizeKnowledgeText(languageCode, text);
   const now = ctx.clock.nowIso();
 
-  const existing = await ctx.repos.knowledge.findByNormalized(
+  const existing = await ctx.repos.knowledge.findAnyByNormalized(
     input.learnerId,
     languageCode,
-    type,
     normalizedText,
   );
   if (existing) {
-    // Enrich instead of duplicating: fill in a missing meaning / new examples.
+    // Pool imports never activate an existing item as a side effect. Explicit
+    // learning imports may reactivate it, but irrelevant items stay excluded.
     const mergedExamples = mergeExamples(existing.examples, input.examples ?? []);
+    const targetStatus = input.poolMode
+      ? existing.status
+      : existing.status === 'irrelevant'
+        ? existing.status
+        : 'active';
     const needsUpdate =
       (!existing.meaning && !!input.meaning) ||
       mergedExamples.length !== existing.examples.length ||
-      existing.status !== 'active';
+      targetStatus !== existing.status;
     if (needsUpdate) {
       const updated: KnowledgeItem = {
         ...existing,
-        meaning: existing.meaning ?? input.meaning ?? null,
+        meaning: existing.meaning ?? input.meaning?.trim() ?? null,
         examples: mergedExamples,
-        status: existing.status === 'irrelevant' ? existing.status : 'active',
+        status: targetStatus,
         updatedAt: now,
       };
       await ctx.repos.knowledge.update(updated);
+      if (existing.status !== 'active' && updated.status === 'active') {
+        const state = await ctx.repos.states.find(
+          input.learnerId,
+          'knowledge_item',
+          updated.id,
+        );
+        if (!state) {
+          await ctx.repos.states.upsert({
+            ...createInitialState({
+              id: ctx.ids.next(),
+              learnerId: input.learnerId,
+              subjectType: 'knowledge_item',
+              subjectId: updated.id,
+              nowIso: now,
+            }),
+            nextReviewAt: now,
+          });
+        }
+      }
+      await recordKnowledgeOperation(ctx, {
+        learnerId: input.learnerId,
+        operation: 'update',
+        knowledgeItemId: updated.id,
+        itemText: updated.text,
+        changes: knowledgeChanges(existing, updated),
+        source: input.entryMethod ?? 'manual',
+        note: '去重时补充了已有条目',
+      });
       return { item: updated, deduplicated: true };
     }
     return { item: existing, deduplicated: true };
@@ -104,21 +146,36 @@ export async function createKnowledgeItem(
     sourceId: input.sourceId ?? null,
     sourceRef: input.sourceRef ?? null,
     aiGenerated: input.aiGenerated ?? origin === 'ai_generated',
-    status: 'active',
+    status: input.poolMode ? 'new' : 'active',
+    wordlistId: input.wordlistId ?? null,
+    entryMethod: input.entryMethod ?? 'manual',
+    frequencyRank: input.frequencyRank ?? null,
     createdAt: now,
     updatedAt: now,
   };
   await ctx.repos.knowledge.create(item);
-
-  // A new item is immediately reviewable; mastery stays 0 until measured.
-  const state = createInitialState({
-    id: ctx.ids.next(),
+  await recordKnowledgeOperation(ctx, {
     learnerId: input.learnerId,
-    subjectType: 'knowledge_item',
-    subjectId: item.id,
-    nowIso: now,
+    operation: input.entryMethod && input.entryMethod !== 'manual' ? 'import' : 'create',
+    knowledgeItemId: item.id,
+    itemText: item.text,
+    changes: { status: [null, item.status] },
+    source: input.entryMethod ?? 'manual',
   });
-  await ctx.repos.states.upsert({ ...state, nextReviewAt: now });
+
+  // Pool items (status='new') are NOT scheduled for review until promoted.
+  // Only 'active' items get an initial SRS state so they appear in due queue.
+  if (!input.poolMode) {
+    // A new item is immediately reviewable; mastery stays 0 until measured.
+    const state = createInitialState({
+      id: ctx.ids.next(),
+      learnerId: input.learnerId,
+      subjectType: 'knowledge_item',
+      subjectId: item.id,
+      nowIso: now,
+    });
+    await ctx.repos.states.upsert({ ...state, nextReviewAt: now });
+  }
 
   await appendEvent(ctx, {
     learnerId: input.learnerId,
@@ -134,6 +191,20 @@ export async function createKnowledgeItem(
   });
 
   return { item, deduplicated: false };
+}
+
+function knowledgeChanges(
+  before: KnowledgeItem,
+  after: KnowledgeItem,
+): Record<string, [unknown, unknown]> {
+  const changes: Record<string, [unknown, unknown]> = {};
+  const fields = ['text', 'type', 'meaning', 'notes', 'tags', 'examples', 'status'] as const;
+  for (const field of fields) {
+    if (JSON.stringify(before[field]) !== JSON.stringify(after[field])) {
+      changes[field] = [before[field], after[field]];
+    }
+  }
+  return changes;
 }
 
 function mergeExamples(
@@ -178,10 +249,9 @@ export async function updateKnowledgeItem(
   const normalizedText = normalizeKnowledgeText(item.languageCode, text);
 
   if (normalizedText !== item.normalizedText || type !== item.type) {
-    const clash = await ctx.repos.knowledge.findByNormalized(
+    const clash = await ctx.repos.knowledge.findAnyByNormalized(
       item.learnerId,
       item.languageCode,
-      type,
       normalizedText,
     );
     if (clash && clash.id !== item.id) {
@@ -202,6 +272,14 @@ export async function updateKnowledgeItem(
     updatedAt: now,
   };
   await ctx.repos.knowledge.update(updated);
+  await recordKnowledgeOperation(ctx, {
+    learnerId: input.learnerId,
+    operation: 'update',
+    knowledgeItemId: updated.id,
+    itemText: updated.text,
+    changes: knowledgeChanges(item, updated),
+    source: 'manual',
+  });
 
   await appendEvent(ctx, {
     learnerId: input.learnerId,
@@ -222,6 +300,14 @@ export async function deleteKnowledgeItem(
   const item = await ctx.repos.knowledge.findById(id);
   if (!item || item.learnerId !== learnerId) throw notFound('KnowledgeItem', id);
   await ctx.repos.knowledge.delete(id);
+  await recordKnowledgeOperation(ctx, {
+    learnerId,
+    operation: 'delete',
+    knowledgeItemId: item.id,
+    itemText: item.text,
+    changes: { status: [item.status, null] },
+    source: 'manual',
+  });
   await appendEvent(ctx, {
     learnerId,
     type: 'knowledge_updated',
@@ -269,7 +355,17 @@ export async function addKnowledgeRelation(
     note: input.note ?? null,
     createdAt: ctx.clock.nowIso(),
   };
-  return ctx.repos.relations.create(relation);
+  const created = await ctx.repos.relations.create(relation);
+  await recordKnowledgeOperation(ctx, {
+    learnerId: input.learnerId,
+    operation: 'update',
+    knowledgeItemId: from.id,
+    itemText: from.text,
+    changes: { relation: [null, { toItemId: to.id, type: relation.type }] },
+    source: 'manual',
+    note: `建立与「${to.text}」的关系`,
+  });
+  return created;
 }
 
 export async function removeKnowledgeRelation(
@@ -280,7 +376,17 @@ export async function removeKnowledgeRelation(
   const relations = await ctx.repos.relations.listByLearner(learnerId);
   const target = relations.find((relation) => relation.id === relationId);
   if (!target) throw notFound('KnowledgeRelation', relationId);
+  const from = await ctx.repos.knowledge.findById(target.fromItemId);
   await ctx.repos.relations.delete(relationId);
+  await recordKnowledgeOperation(ctx, {
+    learnerId,
+    operation: 'update',
+    knowledgeItemId: target.fromItemId,
+    itemText: from?.text ?? null,
+    changes: { relation: [{ toItemId: target.toItemId, type: target.type }, null] },
+    source: 'manual',
+    note: '删除知识关系',
+  });
 }
 
 export interface KnowledgeDetail {
@@ -335,18 +441,24 @@ export async function listKnowledge(
     text?: string;
     types?: KnowledgeType[];
     statuses?: KnowledgeStatus[];
+    tags?: string[];
+    wordlistIds?: string[];
     limit?: number;
     offset?: number;
   },
 ): Promise<KnowledgeListResult> {
-  const items = await ctx.repos.knowledge.search(query);
-  const total = await ctx.repos.knowledge.count(query);
-  const withStates: { item: KnowledgeItem; state: LearnerState | null }[] = [];
-  for (const item of items) {
-    withStates.push({
-      item,
-      state: await ctx.repos.states.find(query.learnerId, 'knowledge_item', item.id),
-    });
-  }
-  return { items: withStates, total };
+  const [items, total] = await Promise.all([
+    ctx.repos.knowledge.search(query),
+    ctx.repos.knowledge.count(query),
+  ]);
+  const states = await ctx.repos.states.listBySubjectIds(
+    query.learnerId,
+    'knowledge_item',
+    items.map((item) => item.id),
+  );
+  const stateByItem = new Map(states.map((state) => [state.subjectId, state]));
+  return {
+    items: items.map((item) => ({ item, state: stateByItem.get(item.id) ?? null })),
+    total,
+  };
 }

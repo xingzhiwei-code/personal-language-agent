@@ -1,5 +1,4 @@
 import { validationFailed } from '@/domain/errors';
-import { appendEvent } from './events';
 import type { AppContext } from './types';
 
 export const DELETE_CONFIRMATION_PHRASE = '删除我的数据';
@@ -27,6 +26,11 @@ export interface LearnerDataExport {
   recommendations: unknown[];
   transferEvidence: unknown[];
   contentSources: unknown[];
+  contents: unknown[];
+  wordlists: unknown[];
+  importExportHistory: unknown[];
+  knowledgeOperationLog: unknown[];
+  scenarios: unknown[];
 }
 
 /**
@@ -37,37 +41,14 @@ export async function exportLearnerData(
   ctx: AppContext,
   learnerId: string,
 ): Promise<LearnerDataExport> {
-  const sessions = await ctx.repos.sessions.listByLearner(learnerId, 1000);
-  const activities: unknown[] = [];
-  const chat: unknown[] = [];
-  for (const session of sessions) {
-    activities.push(...(await ctx.repos.activities.listBySession(session.id)));
-    chat.push(...(await ctx.repos.chat.listBySession(session.id)));
-  }
-
+  const snapshot = await ctx.repos.dataExport.exportAll(learnerId);
   return {
     formatVersion: 1,
     exportedAt: ctx.clock.nowIso(),
     learnerId,
     notice:
-      '这份文件包含你在本地保存的全部学习数据。数据库存储在本机；只有在你使用 AI 对话/解释功能时，相关的少量上下文才会发送给你配置的 AI 服务商。',
-    user: await ctx.repos.users.findById(learnerId),
-    goals: await ctx.repos.goals.listByLearner(learnerId),
-    learningTargets: await ctx.repos.targets.listByLearner(learnerId),
-    knowledgeItems: await ctx.repos.knowledge.search({ learnerId, limit: 10_000 }),
-    knowledgeRelations: await ctx.repos.relations.listByLearner(learnerId),
-    learnerStates: await ctx.repos.states.listByLearner(learnerId),
-    learningSessions: sessions,
-    learningActivities: activities,
-    assessments: await ctx.repos.assessments.listByLearner(learnerId, 10_000),
-    learningEvents: await ctx.repos.events.listByLearner(learnerId, 10_000),
-    chatMessages: chat,
-    memories: await ctx.repos.memories.listByLearner(learnerId),
-    preferences: await ctx.repos.preferences.listByLearner(learnerId),
-    userContexts: await ctx.repos.contexts.listByLearner(learnerId, 1000),
-    recommendations: await ctx.repos.recommendations.listRecent(learnerId, 1000),
-    transferEvidence: await ctx.repos.transfer.listByLearner(learnerId, 1000),
-    contentSources: await ctx.repos.content.listSourcesByLearner(learnerId, 1000),
+      '这份文件包含你在本地保存的全部学习数据。数据库存储在本机；AI 对话/解释只发送裁剪后的相关上下文，文本提炼会发送你当次主动粘贴的文本。',
+    ...snapshot,
   };
 }
 
@@ -99,7 +80,10 @@ export async function deleteLearnerData(
 
   await ctx.repos.deleteAllForLearner(learnerId);
 
-  const keys = await ctx.storage.list(`exports/${learnerId}`);
+  const keys = [
+    ...(await ctx.storage.list(`exports/${learnerId}`)),
+    ...(await ctx.storage.list(`import-staging/${learnerId}`)),
+  ];
   for (const key of keys) {
     await ctx.storage.delete(key);
   }
@@ -113,13 +97,5 @@ export async function deleteLearnerData(
     createdAt: now,
     updatedAt: now,
   });
-  await appendEvent(ctx, {
-    learnerId,
-    type: 'user_feedback',
-    source: 'user',
-    idempotencyKey: `data-deleted:${now}`,
-    payload: { kind: 'data_deleted' },
-  });
-
   return { deleted: true };
 }

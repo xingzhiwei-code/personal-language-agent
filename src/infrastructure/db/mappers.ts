@@ -5,8 +5,10 @@ import type {
   ContentSource,
   Evidence,
   Goal,
+  ImportExportHistory,
   KnowledgeExample,
   KnowledgeItem,
+  KnowledgeOperationLog,
   KnowledgeRelation,
   LearnerState,
   LearningActivity,
@@ -18,10 +20,13 @@ import type {
   ModalityStat,
   Recommendation,
   RecommendationFactors,
+  Scenario,
   SessionSummary,
+  TimeContext,
   TransferEvidence,
   User,
   UserContext,
+  Wordlist,
 } from '@/domain/entities';
 import type {
   ActivityItemStatus,
@@ -33,11 +38,17 @@ import type {
   EventType,
   GoalStatus,
   Intent,
+  KnowledgeEntryMethod,
+  KnowledgeOperationType,
   KnowledgeRelationType,
   KnowledgeStatus,
   KnowledgeType,
   MemoryKind,
   Modality,
+  OperationStatus,
+  OperationType,
+  ScenarioStatus,
+  ScenarioType,
   SessionStatus,
   SkillKind,
   SourceType,
@@ -51,7 +62,9 @@ import type {
   contentSources,
   contents,
   goals,
+  importExportHistory,
   knowledgeItems,
+  knowledgeOperationLog,
   knowledgeRelations,
   learnerStates,
   learningActivities,
@@ -61,9 +74,11 @@ import type {
   learningTargets,
   memories,
   recommendations,
+  scenarios,
   transferEvidences,
   userContexts,
   users,
+  wordlists,
 } from './schema';
 
 type Row<T extends { $inferSelect: unknown }> = T['$inferSelect'];
@@ -148,6 +163,9 @@ export const toKnowledgeItem = (row: Row<typeof knowledgeItems>): KnowledgeItem 
   sourceRef: row.sourceRef,
   aiGenerated: row.aiGenerated,
   status: row.status as KnowledgeStatus,
+  wordlistId: row.wordlistId ?? null,
+  entryMethod: (row.entryMethod ?? 'manual') as KnowledgeEntryMethod,
+  frequencyRank: row.frequencyRank ?? null,
   createdAt: row.createdAt,
   updatedAt: row.updatedAt,
 });
@@ -345,4 +363,68 @@ export const toTransferEvidence = (
   note: row.note,
   occurredAt: row.occurredAt,
   createdAt: row.createdAt,
+});
+
+// ── v0.2 mappers ─────────────────────────────────────────────────────────────
+
+export const toWordlist = (row: Row<typeof wordlists>): Wordlist => ({
+  id: row.id,
+  learnerId: row.learnerId,
+  name: row.name,
+  languageCode: row.languageCode,
+  goalId: row.goalId ?? null,
+  tags: row.tags ?? [],
+  sourceFile: row.sourceFile ?? null,
+  itemCount: row.itemCount,
+  createdAt: row.createdAt,
+  updatedAt: row.updatedAt,
+});
+
+export const toImportExportHistory = (
+  row: Row<typeof importExportHistory>,
+): ImportExportHistory => ({
+  id: row.id,
+  learnerId: row.learnerId,
+  type: row.type as OperationType,
+  method: row.method as KnowledgeEntryMethod,
+  sourceLabel: row.sourceLabel,
+  fileHash: row.fileHash ?? null,
+  format: row.format,
+  totalCount: row.totalCount,
+  addedCount: row.addedCount,
+  duplicateCount: row.duplicateCount,
+  failedCount: row.failedCount,
+  status: row.status as OperationStatus,
+  errors: (row.errors ?? []) as { row: number; reason: string }[],
+  wordlistId: row.wordlistId ?? null,
+  goalId: row.goalId ?? null,
+  createdAt: row.createdAt,
+});
+
+export const toKnowledgeOperationLog = (
+  row: Row<typeof knowledgeOperationLog>,
+): KnowledgeOperationLog => ({
+  id: row.id,
+  learnerId: row.learnerId,
+  operation: row.operation as KnowledgeOperationType,
+  knowledgeItemId: row.knowledgeItemId ?? null,
+  itemText: row.itemText ?? null,
+  changes: (row.changes ?? {}) as Record<string, unknown>,
+  source: (row.source ?? 'manual') as KnowledgeEntryMethod,
+  note: row.note ?? null,
+  createdAt: row.createdAt,
+});
+
+export const toScenario = (row: Row<typeof scenarios>): Scenario => ({
+  id: row.id,
+  learnerId: row.learnerId,
+  goalId: row.goalId ?? null,
+  parentId: row.parentId ?? null,
+  name: row.name,
+  type: row.type as ScenarioType,
+  timeContext: row.timeContext as TimeContext | null,
+  status: row.status as ScenarioStatus,
+  knowledgeItemIds: row.knowledgeItemIds ?? [],
+  createdAt: row.createdAt,
+  updatedAt: row.updatedAt,
 });

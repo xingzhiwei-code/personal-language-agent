@@ -8,6 +8,7 @@ import type {
 } from '@/domain/entities';
 import type { SkillKind, Trend } from '@/domain/enums';
 import { getCurrentContext } from './context';
+import { isRestingToday } from './daily-plan';
 import { ensureLearner } from './goals';
 import { generateRecommendations } from './recommendations';
 import { findResumableSession } from './sessions';
@@ -34,6 +35,7 @@ export interface HomeView {
   resumable: LearningSession | null;
   context: UserContext | null;
   aiAvailable: boolean;
+  restingToday: boolean;
   stats: {
     dueCount: number;
     knowledgeCount: number;
@@ -84,7 +86,8 @@ export async function getHomeView(ctx: AppContext, learnerId: string): Promise<H
 
   const goal = await ctx.repos.goals.findPrimary(learnerId);
   const targets = goal ? await ctx.repos.targets.listByGoal(goal.id) : [];
-  const recommendations = goal ? await getOrCreateRecommendations(ctx, learnerId) : [];
+  const restingToday = await isRestingToday(ctx, learnerId);
+  const recommendations = goal && !restingToday ? await getOrCreateRecommendations(ctx, learnerId) : [];
 
   const now = ctx.clock.nowIso();
   const sevenDaysAgo = new Date(Date.parse(now) - 7 * 86_400_000).toISOString();
@@ -110,6 +113,7 @@ export async function getHomeView(ctx: AppContext, learnerId: string): Promise<H
     resumable: await findResumableSession(ctx, learnerId),
     context: await getCurrentContext(ctx, learnerId),
     aiAvailable: ctx.llm.isConfigured(),
+    restingToday,
     stats: {
       dueCount: dueStates.length,
       knowledgeCount,

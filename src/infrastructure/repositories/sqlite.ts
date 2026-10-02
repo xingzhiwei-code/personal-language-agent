@@ -32,20 +32,28 @@ import type {
   ChatMessageRepository,
   ContentRepository,
   EventRepository,
+  FileImportRepository,
   GoalRepository,
+  ImportExportHistoryRepository,
+  KnowledgeOperationLogRepository,
+  KnowledgePoolRepository,
   KnowledgeRelationRepository,
   KnowledgeRepository,
   KnowledgeSearchQuery,
+  LearnerDataExportRepository,
   LearnerStateRepository,
   LearningTargetRepository,
   MemoryRepository,
   PreferenceRepository,
   RecommendationRepository,
   Repositories,
+  ScenarioRepository,
   SessionRepository,
+  SessionStartRepository,
   TransferEvidenceRepository,
   UserContextRepository,
   UserRepository,
+  WordlistRepository,
 } from '@/domain/ports';
 import type { Db } from '../db/client';
 import {
@@ -56,17 +64,21 @@ import {
   toContentSource,
   toEvent,
   toGoal,
+  toImportExportHistory,
   toKnowledgeItem,
+  toKnowledgeOperationLog,
   toLearnerState,
   toMemory,
   toPreference,
   toRecommendation,
   toRelation,
+  toScenario,
   toSession,
   toTarget,
   toTransferEvidence,
   toUser,
   toUserContext,
+  toWordlist,
 } from '../db/mappers';
 import * as t from '../db/schema';
 
@@ -105,9 +117,32 @@ export function createSqliteRepositories(db: Db): Repositories {
       await db.insert(t.goals).values(goal);
       return goal;
     },
+    async createAsPrimary(goal: Goal) {
+      db.transaction((tx) => {
+        tx.update(t.goals)
+          .set({ isPrimary: false, priority: 2 })
+          .where(eq(t.goals.learnerId, goal.learnerId))
+          .run();
+        tx.insert(t.goals).values({ ...goal, isPrimary: true, priority: 1 }).run();
+      });
+      return { ...goal, isPrimary: true, priority: 1 };
+    },
     async update(goal: Goal) {
       await db.update(t.goals).set(goal).where(eq(t.goals.id, goal.id));
       return goal;
+    },
+    async setPrimary(goal: Goal) {
+      db.transaction((tx) => {
+        tx.update(t.goals)
+          .set({ isPrimary: false, priority: 2 })
+          .where(eq(t.goals.learnerId, goal.learnerId))
+          .run();
+        tx.update(t.goals)
+          .set({ ...goal, isPrimary: true, priority: 1, status: 'active' })
+          .where(and(eq(t.goals.id, goal.id), eq(t.goals.learnerId, goal.learnerId)))
+          .run();
+      });
+      return { ...goal, isPrimary: true, priority: 1, status: 'active' };
     },
     async findById(id) {
       return first((await db.select().from(t.goals).where(eq(t.goals.id, id)).limit(1)).map(toGoal));
@@ -149,7 +184,7 @@ export function createSqliteRepositories(db: Db): Repositories {
     async clearPrimary(learnerId) {
       await db
         .update(t.goals)
-        .set({ isPrimary: false })
+        .set({ isPrimary: false, priority: 2 })
         .where(eq(t.goals.learnerId, learnerId));
     },
     async findLatestByRawInput(learnerId, rawInput) {
@@ -219,6 +254,9 @@ export function createSqliteRepositories(db: Db): Repositories {
         conditions.push(like(t.knowledgeItems.tags, `%"${escapeLike(tag)}"%`));
       }
     }
+    if (query.wordlistIds && query.wordlistIds.length > 0) {
+      conditions.push(inArray(t.knowledgeItems.wordlistId, query.wordlistIds));
+    }
     return and(...conditions);
   };
 
@@ -261,12 +299,38 @@ export function createSqliteRepositories(db: Db): Repositories {
         .limit(1);
       return rows.length > 0 ? toKnowledgeItem(rows[0]!) : null;
     },
+    async findAnyByNormalized(learnerId, languageCode, normalizedText) {
+      const rows = await db
+        .select()
+        .from(t.knowledgeItems)
+        .where(
+          and(
+            eq(t.knowledgeItems.learnerId, learnerId),
+            eq(t.knowledgeItems.languageCode, languageCode),
+            eq(t.knowledgeItems.normalizedText, normalizedText),
+          ),
+        )
+        .limit(1);
+      return rows.length > 0 ? toKnowledgeItem(rows[0]!) : null;
+    },
+    async listNormalizedByLanguage(learnerId, languageCode) {
+      const rows = await db
+        .select({ normalizedText: t.knowledgeItems.normalizedText })
+        .from(t.knowledgeItems)
+        .where(
+          and(
+            eq(t.knowledgeItems.learnerId, learnerId),
+            eq(t.knowledgeItems.languageCode, languageCode),
+          ),
+        );
+      return rows.map((row) => row.normalizedText);
+    },
     async search(query) {
       const rows = await db
         .select()
         .from(t.knowledgeItems)
         .where(knowledgeWhere(query))
-        .orderBy(desc(t.knowledgeItems.updatedAt))
+        .orderBy(desc(t.knowledgeItems.updatedAt), asc(t.knowledgeItems.id))
         .limit(query.limit ?? 50)
         .offset(query.offset ?? 0);
       return rows.map(toKnowledgeItem);
@@ -389,6 +453,20 @@ export function createSqliteRepositories(db: Db): Repositories {
           and(
             eq(t.learnerStates.learnerId, learnerId),
             eq(t.learnerStates.subjectType, subjectType),
+          ),
+        );
+      return rows.map(toLearnerState);
+    },
+    async listBySubjectIds(learnerId, subjectType, subjectIds) {
+      if (subjectIds.length === 0) return [];
+      const rows = await db
+        .select()
+        .from(t.learnerStates)
+        .where(
+          and(
+            eq(t.learnerStates.learnerId, learnerId),
+            eq(t.learnerStates.subjectType, subjectType),
+            inArray(t.learnerStates.subjectId, subjectIds),
           ),
         );
       return rows.map(toLearnerState);
@@ -942,6 +1020,15 @@ export function createSqliteRepositories(db: Db): Repositories {
     },
   };
 
+  const wordlistsRepo = createWordlistRepository(db);
+  const importExportHistoryRepo = createImportExportHistoryRepository(db);
+  const operationLogRepo = createKnowledgeOperationLogRepository(db);
+  const scenariosRepo = createScenarioRepository(db);
+  const fileImportsRepo = createFileImportRepository(db);
+  const knowledgePoolRepo = createKnowledgePoolRepository(db);
+  const dataExportRepo = createLearnerDataExportRepository(db);
+  const sessionStartsRepo = createSessionStartRepository(db);
+
   return {
     users,
     goals,
@@ -952,6 +1039,7 @@ export function createSqliteRepositories(db: Db): Repositories {
     events,
     assessments: assessmentsRepo,
     sessions,
+    sessionStarts: sessionStartsRepo,
     activities,
     chat,
     memories: memoriesRepo,
@@ -960,6 +1048,13 @@ export function createSqliteRepositories(db: Db): Repositories {
     recommendations: recommendationsRepo,
     transfer,
     content,
+    wordlists: wordlistsRepo,
+    importExportHistory: importExportHistoryRepo,
+    operationLog: operationLogRepo,
+    scenarios: scenariosRepo,
+    fileImports: fileImportsRepo,
+    knowledgePool: knowledgePoolRepo,
+    dataExport: dataExportRepo,
     async deleteAllForLearner(learnerId: string) {
       db.transaction((tx) => {
         tx.delete(t.assessments).where(eq(t.assessments.learnerId, learnerId)).run();
@@ -993,7 +1088,526 @@ export function createSqliteRepositories(db: Db): Repositories {
           .run();
         tx.delete(t.contents).where(eq(t.contents.learnerId, learnerId)).run();
         tx.delete(t.contentSources).where(eq(t.contentSources.learnerId, learnerId)).run();
+        tx.delete(t.wordlists).where(eq(t.wordlists.learnerId, learnerId)).run();
+        tx.delete(t.importExportHistory)
+          .where(eq(t.importExportHistory.learnerId, learnerId))
+          .run();
+        tx.delete(t.knowledgeOperationLog)
+          .where(eq(t.knowledgeOperationLog.learnerId, learnerId))
+          .run();
+        tx.delete(t.scenarios).where(eq(t.scenarios.learnerId, learnerId)).run();
       });
+    },
+  };
+}
+
+// ── v0.2 repository factory helpers ──────────────────────────────────────────
+// These are defined as standalone functions and injected in createSqliteRepositories.
+
+export function createSessionStartRepository(db: Db): SessionStartRepository {
+  return {
+    async commit(input) {
+      return db.transaction((tx) => {
+        const existingRows = tx
+          .select()
+          .from(t.learningSessions)
+          .where(
+            and(
+              eq(t.learningSessions.learnerId, input.session.learnerId),
+              eq(t.learningSessions.clientToken, input.session.clientToken!),
+            ),
+          )
+          .limit(1)
+          .all();
+        if (existingRows[0]) {
+          const existing = toSession(existingRows[0]);
+          const activities = tx
+            .select()
+            .from(t.learningActivities)
+            .where(eq(t.learningActivities.sessionId, existing.id))
+            .orderBy(asc(t.learningActivities.position))
+            .all()
+            .map(toActivity);
+          return { session: existing, activities, created: false };
+        }
+        if (input.recommendationId) {
+          const claimed = tx
+            .update(t.recommendations)
+            .set({ status: 'accepted' })
+            .where(
+              and(
+                eq(t.recommendations.id, input.recommendationId),
+                eq(t.recommendations.learnerId, input.session.learnerId),
+                eq(t.recommendations.status, 'offered'),
+              ),
+            )
+            .run();
+          if (claimed.changes !== 1) return null;
+        }
+        tx.insert(t.learningSessions).values(input.session).run();
+        if (input.activities.length > 0) {
+          tx.insert(t.learningActivities).values(input.activities).run();
+        }
+        for (const event of input.events) {
+          tx.insert(t.learningEvents).values(event).onConflictDoNothing().run();
+        }
+        return { session: input.session, activities: input.activities, created: true };
+      });
+    },
+  };
+}
+
+export function createLearnerDataExportRepository(db: Db): LearnerDataExportRepository {
+  return {
+    async exportAll(learnerId) {
+      const [user] = await db.select().from(t.users).where(eq(t.users.id, learnerId)).limit(1);
+      return {
+        user: user ?? null,
+        goals: await db.select().from(t.goals).where(eq(t.goals.learnerId, learnerId)),
+        learningTargets: await db.select().from(t.learningTargets).where(eq(t.learningTargets.learnerId, learnerId)),
+        knowledgeItems: await db.select().from(t.knowledgeItems).where(eq(t.knowledgeItems.learnerId, learnerId)),
+        knowledgeRelations: await db.select().from(t.knowledgeRelations).where(eq(t.knowledgeRelations.learnerId, learnerId)),
+        learnerStates: await db.select().from(t.learnerStates).where(eq(t.learnerStates.learnerId, learnerId)),
+        learningSessions: await db.select().from(t.learningSessions).where(eq(t.learningSessions.learnerId, learnerId)),
+        learningActivities: await db.select().from(t.learningActivities).where(eq(t.learningActivities.learnerId, learnerId)),
+        assessments: await db.select().from(t.assessments).where(eq(t.assessments.learnerId, learnerId)),
+        learningEvents: await db.select().from(t.learningEvents).where(eq(t.learningEvents.learnerId, learnerId)),
+        chatMessages: await db.select().from(t.chatMessages).where(eq(t.chatMessages.learnerId, learnerId)),
+        memories: await db.select().from(t.memories).where(eq(t.memories.learnerId, learnerId)),
+        preferences: await db.select().from(t.learningPreferences).where(eq(t.learningPreferences.learnerId, learnerId)),
+        userContexts: await db.select().from(t.userContexts).where(eq(t.userContexts.learnerId, learnerId)),
+        recommendations: await db.select().from(t.recommendations).where(eq(t.recommendations.learnerId, learnerId)),
+        transferEvidence: await db.select().from(t.transferEvidences).where(eq(t.transferEvidences.learnerId, learnerId)),
+        contentSources: await db
+          .select()
+          .from(t.contentSources)
+          .where(or(eq(t.contentSources.learnerId, learnerId), isNull(t.contentSources.learnerId))),
+        contents: await db.select().from(t.contents).where(eq(t.contents.learnerId, learnerId)),
+        wordlists: await db.select().from(t.wordlists).where(eq(t.wordlists.learnerId, learnerId)),
+        importExportHistory: await db.select().from(t.importExportHistory).where(eq(t.importExportHistory.learnerId, learnerId)),
+        knowledgeOperationLog: await db.select().from(t.knowledgeOperationLog).where(eq(t.knowledgeOperationLog.learnerId, learnerId)),
+        scenarios: await db.select().from(t.scenarios).where(eq(t.scenarios.learnerId, learnerId)),
+      };
+    },
+  };
+}
+
+export function createKnowledgePoolRepository(db: Db): KnowledgePoolRepository {
+  return {
+    async promote(batch) {
+      return db.transaction((tx) => {
+        let allowance = batch.itemIds.length;
+        if (batch.automaticBudget) {
+          const rows = tx
+            .select({ payload: t.learningEvents.payload })
+            .from(t.learningEvents)
+            .where(
+              and(
+                eq(t.learningEvents.learnerId, batch.learnerId),
+                eq(t.learningEvents.type, 'knowledge_pool_promoted'),
+              ),
+            )
+            .all();
+          const used = rows.reduce((sum, row) => {
+            const payload = row.payload as {
+              mode?: string;
+              dayKey?: string;
+              itemIds?: unknown[];
+            };
+            return payload.mode === 'automatic' &&
+              payload.dayKey === batch.automaticBudget?.dayKey &&
+              Array.isArray(payload.itemIds)
+              ? sum + payload.itemIds.length
+              : sum;
+          }, 0);
+          allowance = Math.max(0, batch.automaticBudget.budget - used);
+        }
+        if (allowance === 0 || batch.itemIds.length === 0) return [];
+
+        const rows = tx
+          .select()
+          .from(t.knowledgeItems)
+          .where(
+            and(
+              eq(t.knowledgeItems.learnerId, batch.learnerId),
+              eq(t.knowledgeItems.status, 'new'),
+              inArray(t.knowledgeItems.id, batch.itemIds),
+            ),
+          )
+          .all();
+        const byId = new Map(rows.map((row) => [row.id, row]));
+        const selected = batch.itemIds
+          .map((id) => byId.get(id))
+          .filter((row): row is NonNullable<typeof row> => row !== undefined)
+          .slice(0, allowance);
+        if (selected.length === 0) return [];
+        const selectedIds = new Set(selected.map((row) => row.id));
+
+        for (const row of selected) {
+          tx.update(t.knowledgeItems)
+            .set({ status: 'active', updatedAt: batch.event.occurredAt })
+            .where(
+              and(
+                eq(t.knowledgeItems.id, row.id),
+                eq(t.knowledgeItems.learnerId, batch.learnerId),
+                eq(t.knowledgeItems.status, 'new'),
+              ),
+            )
+            .run();
+        }
+        const states = batch.states.filter((state) => selectedIds.has(state.subjectId));
+        if (states.length > 0) {
+          tx.insert(t.learnerStates).values(states).onConflictDoNothing().run();
+        }
+        const logs = batch.logs.filter(
+          (entry) => entry.knowledgeItemId !== null && selectedIds.has(entry.knowledgeItemId),
+        );
+        if (logs.length > 0) tx.insert(t.knowledgeOperationLog).values(logs).run();
+        tx.insert(t.learningEvents)
+          .values({
+            ...batch.event,
+            payload: {
+              ...batch.event.payload,
+              itemIds: selected.map((row) => row.id),
+              count: selected.length,
+            },
+          })
+          .onConflictDoNothing()
+          .run();
+        return selected.map((row) =>
+          toKnowledgeItem({ ...row, status: 'active', updatedAt: batch.event.occurredAt }),
+        );
+      });
+    },
+    async pause(input) {
+      return db.transaction((tx) => {
+        if (input.itemIds.length === 0) return [];
+        const rows = tx
+          .select()
+          .from(t.knowledgeItems)
+          .where(
+            and(
+              eq(t.knowledgeItems.learnerId, input.learnerId),
+              eq(t.knowledgeItems.status, 'active'),
+              inArray(t.knowledgeItems.id, input.itemIds),
+            ),
+          )
+          .all();
+        const selectedIds = new Set(rows.map((row) => row.id));
+        for (const row of rows) {
+          tx.update(t.knowledgeItems)
+            .set({ status: 'new', updatedAt: input.nowIso })
+            .where(eq(t.knowledgeItems.id, row.id))
+            .run();
+        }
+        if (selectedIds.size > 0) {
+          tx.update(t.learnerStates)
+            .set({ nextReviewAt: null, updatedAt: input.nowIso })
+            .where(
+              and(
+                eq(t.learnerStates.learnerId, input.learnerId),
+                eq(t.learnerStates.subjectType, 'knowledge_item'),
+                inArray(t.learnerStates.subjectId, [...selectedIds]),
+              ),
+            )
+            .run();
+          const logs = input.logs.filter(
+            (entry) => entry.knowledgeItemId !== null && selectedIds.has(entry.knowledgeItemId),
+          );
+          if (logs.length > 0) tx.insert(t.knowledgeOperationLog).values(logs).run();
+        }
+        return rows.map((row) =>
+          toKnowledgeItem({ ...row, status: 'new', updatedAt: input.nowIso }),
+        );
+      });
+    },
+  };
+}
+
+export function createFileImportRepository(db: Db): FileImportRepository {
+  return {
+    async commit(batch) {
+      const fileHash = batch.history.fileHash;
+      if (!fileHash) throw new Error('File import requires a hash');
+      return db.transaction((tx) => {
+        const duplicateRows = tx
+          .select()
+          .from(t.importExportHistory)
+          .where(
+            and(
+              eq(t.importExportHistory.learnerId, batch.history.learnerId),
+              eq(t.importExportHistory.fileHash, fileHash),
+              eq(t.importExportHistory.type, 'import'),
+            ),
+          )
+          .limit(1)
+          .all();
+        if (duplicateRows[0]) {
+          const original = toImportExportHistory(duplicateRows[0]);
+          const duplicateAttempt = {
+            ...batch.history,
+            fileHash: null,
+            addedCount: 0,
+            duplicateCount: batch.history.totalCount - batch.history.failedCount,
+            status: 'success' as const,
+            errors: [{ row: 0, reason: `重复文件，原导入记录 ${original.id}` }],
+            wordlistId: original.wordlistId,
+            goalId: original.goalId,
+          };
+          tx.insert(t.importExportHistory).values(duplicateAttempt).run();
+          return {
+            duplicateFile: true,
+            history: duplicateAttempt,
+            wordlist: null,
+            insertedItems: [],
+          };
+        }
+
+        const existingRows = tx
+          .select({ normalizedText: t.knowledgeItems.normalizedText })
+          .from(t.knowledgeItems)
+          .where(
+            and(
+              eq(t.knowledgeItems.learnerId, batch.wordlist.learnerId),
+              eq(t.knowledgeItems.languageCode, batch.wordlist.languageCode),
+            ),
+          )
+          .all();
+        const seen = new Set(existingRows.map((row) => row.normalizedText));
+        const insertedItems = batch.items.filter((item) => {
+          if (seen.has(item.normalizedText)) return false;
+          seen.add(item.normalizedText);
+          return true;
+        });
+        const insertedIds = new Set(insertedItems.map((item) => item.id));
+        const duplicateCount = batch.history.duplicateCount + batch.items.length - insertedItems.length;
+        const status =
+          batch.history.failedCount > 0
+            ? insertedItems.length > 0
+              ? ('partial' as const)
+              : ('failed' as const)
+            : ('success' as const);
+        const history = {
+          ...batch.history,
+          addedCount: insertedItems.length,
+          duplicateCount,
+          status,
+        };
+        const wordlist = { ...batch.wordlist, itemCount: insertedItems.length };
+
+        tx.insert(t.wordlists).values(wordlist).run();
+        for (let offset = 0; offset < insertedItems.length; offset += 200) {
+          tx.insert(t.knowledgeItems)
+            .values(insertedItems.slice(offset, offset + 200))
+            .run();
+        }
+        const states = batch.states.filter((state) => insertedIds.has(state.subjectId));
+        for (let offset = 0; offset < states.length; offset += 200) {
+          tx.insert(t.learnerStates)
+            .values(states.slice(offset, offset + 200))
+            .onConflictDoNothing()
+            .run();
+        }
+        const logs = batch.logs.filter(
+          (entry) => entry.knowledgeItemId !== null && insertedIds.has(entry.knowledgeItemId),
+        );
+        for (let offset = 0; offset < logs.length; offset += 200) {
+          tx.insert(t.knowledgeOperationLog)
+            .values(logs.slice(offset, offset + 200))
+            .run();
+        }
+        tx.insert(t.importExportHistory).values(history).run();
+
+        return { duplicateFile: false, history, wordlist, insertedItems };
+      });
+    },
+  };
+}
+
+export function createWordlistRepository(db: Db): WordlistRepository {
+  return {
+    async create(wordlist) {
+      await db.insert(t.wordlists).values(wordlist);
+      return wordlist;
+    },
+    async update(wordlist) {
+      await db.update(t.wordlists).set(wordlist).where(eq(t.wordlists.id, wordlist.id));
+      return wordlist;
+    },
+    async findById(id) {
+      const rows = await db.select().from(t.wordlists).where(eq(t.wordlists.id, id)).limit(1);
+      return rows.length > 0 ? toWordlist(rows[0]!) : null;
+    },
+    async listByLearner(learnerId) {
+      const rows = await db
+        .select()
+        .from(t.wordlists)
+        .where(eq(t.wordlists.learnerId, learnerId))
+        .orderBy(desc(t.wordlists.createdAt));
+      return rows.map(toWordlist);
+    },
+    async delete(id) {
+      await db.delete(t.wordlists).where(eq(t.wordlists.id, id));
+    },
+  };
+}
+
+export function createImportExportHistoryRepository(
+  db: Db,
+): ImportExportHistoryRepository {
+  return {
+    async create(record) {
+      await db.insert(t.importExportHistory).values(record);
+      return record;
+    },
+    async update(record) {
+      await db
+        .update(t.importExportHistory)
+        .set(record)
+        .where(eq(t.importExportHistory.id, record.id));
+      return record;
+    },
+    async findById(id) {
+      const rows = await db
+        .select()
+        .from(t.importExportHistory)
+        .where(eq(t.importExportHistory.id, id))
+        .limit(1);
+      return rows.length > 0 ? toImportExportHistory(rows[0]!) : null;
+    },
+    async findByFileHash(learnerId, fileHash) {
+      if (!fileHash) return null;
+      const rows = await db
+        .select()
+        .from(t.importExportHistory)
+        .where(
+          and(
+            eq(t.importExportHistory.learnerId, learnerId),
+            eq(t.importExportHistory.fileHash, fileHash),
+            eq(t.importExportHistory.type, 'import'),
+          ),
+        )
+        .orderBy(desc(t.importExportHistory.createdAt))
+        .limit(1);
+      return rows.length > 0 ? toImportExportHistory(rows[0]!) : null;
+    },
+    async listByLearner(learnerId, limit) {
+      const rows = await db
+        .select()
+        .from(t.importExportHistory)
+        .where(eq(t.importExportHistory.learnerId, learnerId))
+        .orderBy(desc(t.importExportHistory.createdAt))
+        .limit(limit);
+      return rows.map(toImportExportHistory);
+    },
+  };
+}
+
+export function createKnowledgeOperationLogRepository(
+  db: Db,
+): KnowledgeOperationLogRepository {
+  return {
+    async append(entry) {
+      await db.insert(t.knowledgeOperationLog).values(entry);
+      return entry;
+    },
+    async listByLearner(learnerId, limit, offset = 0, operations) {
+      const where =
+        operations && operations.length > 0
+          ? and(
+              eq(t.knowledgeOperationLog.learnerId, learnerId),
+              inArray(t.knowledgeOperationLog.operation, operations),
+            )
+          : eq(t.knowledgeOperationLog.learnerId, learnerId);
+      const rows = await db
+        .select()
+        .from(t.knowledgeOperationLog)
+        .where(where)
+        .orderBy(desc(t.knowledgeOperationLog.createdAt))
+        .limit(limit)
+        .offset(offset);
+      return rows.map(toKnowledgeOperationLog);
+    },
+    async listByItem(learnerId, knowledgeItemId, limit) {
+      const rows = await db
+        .select()
+        .from(t.knowledgeOperationLog)
+        .where(
+          and(
+            eq(t.knowledgeOperationLog.learnerId, learnerId),
+            eq(t.knowledgeOperationLog.knowledgeItemId, knowledgeItemId),
+          ),
+        )
+        .orderBy(desc(t.knowledgeOperationLog.createdAt))
+        .limit(limit);
+      return rows.map(toKnowledgeOperationLog);
+    },
+    async countByLearner(learnerId) {
+      const rows = await db
+        .select({ value: sql<number>`count(*)` })
+        .from(t.knowledgeOperationLog)
+        .where(eq(t.knowledgeOperationLog.learnerId, learnerId));
+      return rows[0]?.value ?? 0;
+    },
+  };
+}
+
+export function createScenarioRepository(db: Db): ScenarioRepository {
+  return {
+    async create(scenario) {
+      await db.insert(t.scenarios).values(scenario);
+      return scenario;
+    },
+    async update(scenario) {
+      await db.update(t.scenarios).set(scenario).where(eq(t.scenarios.id, scenario.id));
+      return scenario;
+    },
+    async findById(id) {
+      const rows = await db.select().from(t.scenarios).where(eq(t.scenarios.id, id)).limit(1);
+      return rows.length > 0 ? toScenario(rows[0]!) : null;
+    },
+    async listByLearner(learnerId, statuses) {
+      const where =
+        statuses && statuses.length > 0
+          ? and(eq(t.scenarios.learnerId, learnerId), inArray(t.scenarios.status, statuses))
+          : eq(t.scenarios.learnerId, learnerId);
+      const rows = await db
+        .select()
+        .from(t.scenarios)
+        .where(where)
+        .orderBy(desc(t.scenarios.createdAt));
+      return rows.map(toScenario);
+    },
+    async listByGoal(goalId) {
+      const rows = await db
+        .select()
+        .from(t.scenarios)
+        .where(eq(t.scenarios.goalId, goalId))
+        .orderBy(desc(t.scenarios.createdAt));
+      return rows.map(toScenario);
+    },
+    async archiveExpired(learnerId, nowIso) {
+      const activeRows = await db
+        .select()
+        .from(t.scenarios)
+        .where(
+          and(eq(t.scenarios.learnerId, learnerId), eq(t.scenarios.status, 'active')),
+        );
+      let count = 0;
+      for (const row of activeRows) {
+        const tc = row.timeContext as { resolvedDueAt?: string | null } | null;
+        if (tc?.resolvedDueAt && tc.resolvedDueAt <= nowIso) {
+          await db
+            .update(t.scenarios)
+            .set({ status: 'done', updatedAt: nowIso })
+            .where(eq(t.scenarios.id, row.id));
+          count++;
+        }
+      }
+      return count;
+    },
+    async delete(id) {
+      await db.delete(t.scenarios).where(eq(t.scenarios.id, id));
     },
   };
 }

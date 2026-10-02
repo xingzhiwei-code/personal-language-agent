@@ -24,7 +24,7 @@ export default defineConfig({
   webServer: {
     command: `npm run dev -- --port ${PORT} --hostname 127.0.0.1`,
     url: BASE_URL,
-    reuseExistingServer: false,
+    reuseExistingServer: process.env.E2E_REUSE_SERVER === '1',
     timeout: 180_000,
     stdout: 'ignore',
     stderr: 'pipe',

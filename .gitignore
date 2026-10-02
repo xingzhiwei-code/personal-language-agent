@@ -6,8 +6,10 @@ build/
 *.tsbuildinfo
 next-env.d.ts
 
-# Local data (SQLite + local object storage)
-data/
+# Local data (SQLite + local object storage); hand-written samples are versioned.
+data/*
+!data/samples/
+!data/samples/**
 *.db
 *.db-journal
 *.db-wal

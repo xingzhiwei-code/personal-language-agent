@@ -1,6 +1,7 @@
 import type { KnowledgeItem, LearnerState } from '@/domain/entities';
 import type { FeedbackKind, SubjectType } from '@/domain/enums';
 import { applyNotRelevant, applyUserDeclaredMastery } from '@/learner/state';
+import { recordKnowledgeOperation } from './audit';
 import { appendEvent } from './events';
 import { loadOrCreateState, saveState } from './learner-state';
 import { saveMemory, setPreference } from './memory';
@@ -64,8 +65,18 @@ export async function recordFeedback(
         if (subjectType === 'knowledge_item') {
           item = await ctx.repos.knowledge.findById(input.subjectId);
           if (item) {
+            const before = item;
             item = { ...item, status: 'user_mastered', updatedAt: now };
             await ctx.repos.knowledge.update(item);
+            await recordKnowledgeOperation(ctx, {
+              learnerId: input.learnerId,
+              operation: 'update',
+              knowledgeItemId: item.id,
+              itemText: item.text,
+              changes: { status: [before.status, item.status] },
+              source: 'manual',
+              note: '用户标记为已掌握',
+            });
           }
         }
       }
@@ -84,8 +95,18 @@ export async function recordFeedback(
         if (subjectType === 'knowledge_item') {
           item = await ctx.repos.knowledge.findById(input.subjectId);
           if (item) {
+            const before = item;
             item = { ...item, status: 'irrelevant', updatedAt: now };
             await ctx.repos.knowledge.update(item);
+            await recordKnowledgeOperation(ctx, {
+              learnerId: input.learnerId,
+              operation: 'update',
+              knowledgeItemId: item.id,
+              itemText: item.text,
+              changes: { status: [before.status, item.status] },
+              source: 'manual',
+              note: '用户标记为不相关',
+            });
           }
         }
       }

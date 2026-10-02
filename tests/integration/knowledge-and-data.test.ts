@@ -269,6 +269,8 @@ describe('data management', () => {
       0,
     );
     expect(await harness.ctx.repos.memories.listByLearner(LOCAL_LEARNER_ID)).toHaveLength(0);
+    expect(await harness.ctx.repos.events.listByLearner(LOCAL_LEARNER_ID, 10)).toHaveLength(0);
+    expect(await harness.ctx.repos.operationLog.listByLearner(LOCAL_LEARNER_ID, 10)).toHaveLength(0);
     expect(await harness.ctx.storage.list(`exports/${LOCAL_LEARNER_ID}`)).toHaveLength(0);
 
     // The learner row is recreated so the app keeps working.
