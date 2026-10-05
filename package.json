@@ -1,13 +1,14 @@
 {
   "name": "personal-language-agent",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=20.9.0"
+    "node": "20.x"
   },
   "scripts": {
-    "dev": "next dev",
+    "dev": "node scripts/dev.mjs",
+    "dev:next": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",

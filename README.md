@@ -1,8 +1,12 @@
-# Personal Language Learning Agent — V0.2
+# Personal Language Learning Agent — V0.3
 
 一个会适应你的个人语言学习系统：它记住你的目标、能力、知识、常见错误和当前处境，并用尽可能少的操作成本，帮你完成此刻最有价值的学习。
 
 **不是**固定课程 App，**也不是**只会聊天的英语机器人。
+
+> ⚠️ **Node 版本硬性要求：必须使用 Node 20**（如 `nvm use 20`）。
+> `better-sqlite3` 在 Node 24 下 ABI 不匹配，会导致知识库页直接 500。`npm run dev`
+> 已内置版本检查，非 Node 20 会直接报错退出。
 
 - 产品需求：[`prd.md`](./prd.md)
 - 开发里程碑：[`development-milestones.md`](./development-milestones.md)
@@ -15,7 +19,7 @@
 
 | 依赖 | 版本 | 说明 |
 |---|---|---|
-| Node.js | ≥ 20.9 | 已在 v20.17 验证 |
+| Node.js | **20.x（唯一支持）** | 已在 v20.17 验证；Node 24 会因 `better-sqlite3` ABI 不匹配而失败 |
 | npm | ≥ 10 | 仓库使用 npm（无 pnpm 时的可靠选择） |
 | 编译工具链 | 可选 | `better-sqlite3` 优先使用预编译包；没有时需要 `cc/gcc` |
 

@@ -120,6 +120,12 @@ export interface KnowledgeRepository {
   ): Promise<KnowledgeItem | null>;
   /** Used by import preview for deterministic, type-independent de-duplication. */
   listNormalizedByLanguage(learnerId: string, languageCode: string): Promise<string[]>;
+  /** Batch lookup for import completion: returns items matching the given normalised forms. */
+  listByNormalizedTexts(
+    learnerId: string,
+    languageCode: string,
+    normalizedTexts: string[],
+  ): Promise<KnowledgeItem[]>;
   search(query: KnowledgeSearchQuery): Promise<KnowledgeItem[]>;
   count(query: KnowledgeSearchQuery): Promise<number>;
   listByIds(ids: string[]): Promise<KnowledgeItem[]>;
@@ -302,6 +308,10 @@ export interface FileImportBatch {
   items: KnowledgeItem[];
   states: LearnerState[];
   logs: KnowledgeOperationLog[];
+  /** Existing items whose empty fields are filled by this import (fill-only). */
+  completions: KnowledgeItem[];
+  /** Operation-log entries for the fill-only completions. */
+  completionLogs: KnowledgeOperationLog[];
 }
 
 export interface FileImportCommitResult {
@@ -309,6 +319,7 @@ export interface FileImportCommitResult {
   history: ImportExportHistory;
   wordlist: Wordlist | null;
   insertedItems: KnowledgeItem[];
+  completedCount: number;
 }
 
 export interface PoolPromotionBatch {

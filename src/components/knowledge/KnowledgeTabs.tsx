@@ -2,6 +2,7 @@ import Link from 'next/link';
 
 const TABS = [
   { id: 'library', label: '知识条目', href: '/knowledge' },
+  { id: 'pool', label: '词库池', href: '/knowledge?status=pool' },
   { id: 'sources', label: '已保存原文', href: '/knowledge/sources' },
   { id: 'history', label: '导入导出历史', href: '/knowledge/history' },
   { id: 'logs', label: '操作日志', href: '/knowledge/logs' },

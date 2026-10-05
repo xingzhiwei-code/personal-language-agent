@@ -74,16 +74,18 @@ export async function confirmKnowledgeFileImportAction(
       wordlistName: String(formData.get('wordlistName') ?? ''),
       languageCode: String(formData.get('languageCode') ?? 'en'),
       goalId: String(formData.get('goalId') ?? '').trim() || null,
+      aiGenerated: formData.get('aiGenerated') === 'on',
     });
     await ctx.storage.delete(stagingKey(learnerId, fileHash));
     revalidatePath('/knowledge');
     revalidatePath('/knowledge/import');
+    revalidatePath('/knowledge/logs');
     return {
       ok: true,
       data: result,
       message: result.duplicateFile
         ? '这个文件已经导入过，本次新增 0 条'
-        : `导入完成：新增 ${result.addedCount} 条，跳过 ${result.duplicateCount} 条`,
+        : `导入完成：新增 ${result.addedCount} 条，补全 ${result.completedCount} 条，跳过 ${result.duplicateCount} 条`,
     };
   } catch (error) {
     return { ok: false, message: toActionError(error) };

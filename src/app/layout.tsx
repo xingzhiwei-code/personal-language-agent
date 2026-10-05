@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import Link from 'next/link';
+import { APP_VERSION_LABEL } from '@/config/version';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -29,7 +30,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link href="/" className="text-sm font-semibold tracking-tight text-ink-900">
               语言学习助手
               <span className="ml-2 rounded-full bg-ink-100 px-2 py-0.5 text-[10px] font-normal text-ink-400">
-                V0.1
+                {APP_VERSION_LABEL}
               </span>
             </Link>
             <nav aria-label="主导航" className="hidden gap-1 sm:flex">

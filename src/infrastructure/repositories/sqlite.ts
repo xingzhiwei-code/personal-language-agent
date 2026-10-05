@@ -325,6 +325,21 @@ export function createSqliteRepositories(db: Db): Repositories {
         );
       return rows.map((row) => row.normalizedText);
     },
+    async listByNormalizedTexts(learnerId, languageCode, normalizedTexts) {
+      const unique = [...new Set(normalizedTexts)];
+      if (unique.length === 0) return [];
+      const rows = await db
+        .select()
+        .from(t.knowledgeItems)
+        .where(
+          and(
+            eq(t.knowledgeItems.learnerId, learnerId),
+            eq(t.knowledgeItems.languageCode, languageCode),
+            inArray(t.knowledgeItems.normalizedText, unique),
+          ),
+        );
+      return rows.map(toKnowledgeItem);
+    },
     async search(query) {
       const rows = await db
         .select()
@@ -1360,6 +1375,7 @@ export function createFileImportRepository(db: Db): FileImportRepository {
             history: duplicateAttempt,
             wordlist: null,
             insertedItems: [],
+            completedCount: 0,
           };
         }
 
@@ -1416,9 +1432,28 @@ export function createFileImportRepository(db: Db): FileImportRepository {
             .values(logs.slice(offset, offset + 200))
             .run();
         }
+
+        // Fill-only completion (v0.3 §P5): never overwrite an existing value.
+        for (const completion of batch.completions) {
+          tx.update(t.knowledgeItems)
+            .set(completion)
+            .where(eq(t.knowledgeItems.id, completion.id))
+            .run();
+        }
+        for (let offset = 0; offset < batch.completionLogs.length; offset += 200) {
+          tx.insert(t.knowledgeOperationLog)
+            .values(batch.completionLogs.slice(offset, offset + 200))
+            .run();
+        }
         tx.insert(t.importExportHistory).values(history).run();
 
-        return { duplicateFile: false, history, wordlist, insertedItems };
+        return {
+          duplicateFile: false,
+          history,
+          wordlist,
+          insertedItems,
+          completedCount: batch.completions.length,
+        };
       });
     },
   };

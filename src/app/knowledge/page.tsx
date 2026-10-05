@@ -90,7 +90,7 @@ export default async function KnowledgePage({
         </div>
       </header>
 
-      <KnowledgeTabs active="library" />
+      <KnowledgeTabs active={filter.value === 'pool' ? 'pool' : 'library'} />
 
       <Card>
         <form className="flex flex-wrap items-end gap-2" method="get">

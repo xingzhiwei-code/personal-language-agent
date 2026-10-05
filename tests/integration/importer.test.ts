@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   executeFileImport,
+  hasPhoneticInNotes,
   parseWordlist,
   previewFileImport,
 } from '@/application/importer';
@@ -211,4 +212,77 @@ describe('M2: file import workflow', () => {
     expect(performance.now() - pageStartedAt).toBeLessThan(1_000);
     expect(await h.ctx.repos.states.listDueForReview(LOCAL_LEARNER_ID, h.clock.nowIso(), 10)).toHaveLength(0);
   }, 35_000);
+});
+
+describe('M1 §P5: fill-only import completion', () => {
+  let h: TestHarness;
+
+  beforeEach(() => {
+    h = createTestHarness();
+  });
+  afterEach(() => h.cleanup());
+
+  it('fills empty example and phonetic, never overwriting existing values', async () => {
+    await executeFileImport(h.ctx, {
+      learnerId: LOCAL_LEARNER_ID,
+      fileName: 'base.csv',
+      fileHash: 'sha256:base',
+      format: 'csv',
+      content: 'word,definition\nalpha,甲\nbeta,乙',
+      wordlistName: '基础词库',
+      languageCode: 'en',
+    });
+
+    const enriched =
+      'word,phonetic,pos,definition,example\nalpha,/ˈælfə/,n.,甲,Alpha example.\nbeta,/ˈbiːtə/,n.,乙,Beta example.';
+    const preview = await previewFileImport(h.ctx, {
+      learnerId: LOCAL_LEARNER_ID,
+      fileName: 'enriched.csv',
+      fileHash: 'sha256:enriched',
+      format: 'csv',
+      content: enriched,
+      languageCode: 'en',
+    });
+    expect(preview.estimatedAddedCount).toBe(0);
+    expect(preview.estimatedCompletedCount).toBe(2);
+
+    const result = await executeFileImport(h.ctx, {
+      learnerId: LOCAL_LEARNER_ID,
+      fileName: 'enriched.csv',
+      fileHash: 'sha256:enriched',
+      format: 'csv',
+      content: enriched,
+      wordlistName: '例句补全',
+      languageCode: 'en',
+      aiGenerated: true,
+    });
+    expect(result).toMatchObject({ addedCount: 0, completedCount: 2 });
+
+    const items = await h.ctx.repos.knowledge.search({ learnerId: LOCAL_LEARNER_ID, limit: 10 });
+    const alpha = items.find((item) => item.text === 'alpha')!;
+    const beta = items.find((item) => item.text === 'beta')!;
+    expect(alpha.examples).toHaveLength(1);
+    expect(alpha.examples[0]).toMatchObject({ text: 'Alpha example.', origin: 'ai_generated' });
+    expect(hasPhoneticInNotes(alpha.notes)).toBe(true);
+    expect(beta.examples).toHaveLength(1);
+    expect(hasPhoneticInNotes(beta.notes)).toBe(true);
+
+    // Fill-only: a later import with a different example must NOT overwrite.
+    await executeFileImport(h.ctx, {
+      learnerId: LOCAL_LEARNER_ID,
+      fileName: 'override.csv',
+      fileHash: 'sha256:override',
+      format: 'csv',
+      content: 'word,definition,example\nalpha,甲,Different example.\nbeta,乙,Another example.',
+      wordlistName: '覆盖尝试',
+      languageCode: 'en',
+    });
+    const alphaAfter = await h.ctx.repos.knowledge.findById(alpha.id);
+    expect(alphaAfter!.examples[0]!.text).toBe('Alpha example.');
+
+    const logs = await h.ctx.repos.operationLog.listByLearner(LOCAL_LEARNER_ID, 20);
+    const completionLogs = logs.filter((log) => log.note?.includes('导入补全'));
+    expect(completionLogs).toHaveLength(2);
+    expect(completionLogs.every((log) => log.source === 'file_upload')).toBe(true);
+  });
 });

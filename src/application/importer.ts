@@ -45,6 +45,8 @@ export interface FileImportPreview {
   totalCount: number;
   validCount: number;
   estimatedAddedCount: number;
+  /** Existing items whose empty example/phonetic fields would be filled. */
+  estimatedCompletedCount: number;
   duplicateCount: number;
   failedCount: number;
   duplicateFile: boolean;
@@ -62,6 +64,8 @@ export interface ExecuteFileImportInput {
   wordlistName: string;
   languageCode: string;
   goalId?: string | null;
+  /** Marks the file as LLM-generated, so filled examples are flagged ai_generated. */
+  aiGenerated?: boolean;
 }
 
 export interface FileImportResult {
@@ -71,6 +75,7 @@ export interface FileImportResult {
   totalCount: number;
   addedCount: number;
   duplicateCount: number;
+  completedCount: number;
   failedCount: number;
   errors: ImportIssue[];
 }
@@ -211,6 +216,62 @@ function assertRowLimit(count: number): void {
   }
 }
 
+const PHONETIC_PREFIX = '音标：';
+
+/** v0.2 stores phonetic in the `notes` field as `音标：/x/`. */
+export function hasPhoneticInNotes(notes: string | null): boolean {
+  return notes !== null && notes.includes(PHONETIC_PREFIX);
+}
+
+/** Prepends the phonetic segment to existing notes without touching them. */
+export function withPhoneticInNotes(notes: string | null, phonetic: string): string {
+  const segment = `${PHONETIC_PREFIX}${phonetic}`;
+  if (!notes || notes.trim().length === 0) return segment;
+  return `${segment} · ${notes}`;
+}
+
+interface CompletionBuild {
+  updated: KnowledgeItem;
+  changes: Record<string, [unknown, unknown]>;
+}
+
+/**
+ * Fill-only completion (v0.3 §P5): fills an existing item's empty example /
+ * phonetic fields from the import row, never overwriting an existing value.
+ * Returns null when nothing is missing.
+ */
+export function buildCompletion(
+  existing: KnowledgeItem,
+  entry: ParsedWordlistEntry,
+  sourceLabel: string,
+  nowIso: string,
+  aiGenerated: boolean,
+): CompletionBuild | null {
+  const changes: Record<string, [unknown, unknown]> = {};
+  let examples = existing.examples;
+  let notes = existing.notes;
+
+  if (entry.example && examples.length === 0) {
+    const incoming = {
+      text: entry.example,
+      origin: (aiGenerated ? 'ai_generated' : 'user') as 'ai_generated' | 'user',
+      sourceRef: sourceLabel,
+    };
+    examples = [...examples, incoming];
+    changes['examples'] = [existing.examples, examples];
+  }
+  if (entry.phonetic && !hasPhoneticInNotes(notes)) {
+    notes = withPhoneticInNotes(notes, entry.phonetic);
+    changes['notes'] = [existing.notes, notes];
+  }
+
+  if (Object.keys(changes).length === 0) return null;
+  return {
+    updated: { ...existing, examples, notes, updatedAt: nowIso },
+    changes,
+  };
+}
+
 function validateLanguageCode(languageCode: string): void {
   if (!languageCodeSchema.safeParse(languageCode).success) {
     throw validationFailed('语言代码无效');
@@ -305,6 +366,10 @@ export async function previewFileImport(
     ? parsed.entries.length
     : distinct.duplicateCount + existingCount;
 
+  const estimatedCompletedCount = duplicateHistory
+    ? 0
+    : await estimateCompletions(ctx, input.learnerId, input.languageCode, distinct.entries);
+
   return {
     fileName: input.fileName,
     fileHash: input.fileHash,
@@ -313,6 +378,7 @@ export async function previewFileImport(
     totalCount: parsed.totalCount,
     validCount: parsed.entries.length,
     estimatedAddedCount: duplicateHistory ? 0 : distinct.entries.length - existingCount,
+    estimatedCompletedCount,
     duplicateCount,
     failedCount: parsed.totalCount - parsed.entries.length,
     duplicateFile: duplicateHistory !== null,
@@ -320,6 +386,33 @@ export async function previewFileImport(
     entries: parsed.entries.slice(0, IMPORT_PREVIEW_ROWS),
     errors: parsed.errors,
   };
+}
+
+/** How many existing items would get an empty field filled by this import. */
+async function estimateCompletions(
+  ctx: AppContext,
+  learnerId: string,
+  languageCode: string,
+  entries: ParsedWordlistEntry[],
+): Promise<number> {
+  const normalizedTexts = entries.map((entry) =>
+    normalizeKnowledgeText(languageCode, entry.word),
+  );
+  const existingItems = await ctx.repos.knowledge.listByNormalizedTexts(
+    learnerId,
+    languageCode,
+    normalizedTexts,
+  );
+  const byNormalized = new Map(existingItems.map((item) => [item.normalizedText, item]));
+  let count = 0;
+  for (const entry of entries) {
+    const item = byNormalized.get(normalizeKnowledgeText(languageCode, entry.word));
+    if (!item) continue;
+    const missingExample = !!entry.example && item.examples.length === 0;
+    const missingPhonetic = !!entry.phonetic && !hasPhoneticInNotes(item.notes);
+    if (missingExample || missingPhonetic) count += 1;
+  }
+  return count;
 }
 
 export async function executeFileImport(
@@ -353,6 +446,7 @@ export async function executeFileImport(
     updatedAt: now,
   };
 
+  const aiGenerated = input.aiGenerated ?? false;
   const items: KnowledgeItem[] = distinct.entries.map((entry, index) => {
     const notes = [entry.phonetic ? `音标：${entry.phonetic}` : null, entry.pos ? `词性：${entry.pos}` : null]
       .filter((value): value is string => value !== null)
@@ -369,13 +463,15 @@ export async function executeFileImport(
       notes: restored?.notes ?? (notes || null),
       examples:
         restored?.examples ??
-        (entry.example ? [{ text: entry.example, origin: 'user', sourceRef: sourceLabel }] : []),
+        (entry.example
+          ? [{ text: entry.example, origin: aiGenerated ? 'ai_generated' : 'user', sourceRef: sourceLabel }]
+          : []),
       tags: restored?.tags ?? [],
-      origin: restored?.origin ?? 'user',
+      origin: restored?.origin ?? (aiGenerated ? 'ai_generated' : 'user'),
       sourceType: restored?.sourceType ?? 'user_import',
       sourceId: null,
       sourceRef: restored?.sourceRef ?? sourceLabel,
-      aiGenerated: restored?.aiGenerated ?? false,
+      aiGenerated: restored?.aiGenerated ?? aiGenerated,
       status: restored?.status ?? 'new',
       wordlistId,
       entryMethod: restored ? 'export_restore' : 'file_upload',
@@ -437,7 +533,48 @@ export async function executeFileImport(
     createdAt: now,
   }));
 
-  const committed = await ctx.repos.fileImports.commit({ wordlist, history, items, states, logs });
+  // Fill-only completion (v0.3 §P5): existing entries get their empty example /
+  // phonetic filled, never overwriting an existing value.
+  const existingItems = await ctx.repos.knowledge.listByNormalizedTexts(
+    input.learnerId,
+    input.languageCode,
+    distinct.entries.map((entry) => normalizeKnowledgeText(input.languageCode, entry.word)),
+  );
+  const existingByNormalized = new Map(
+    existingItems.map((item) => [item.normalizedText, item]),
+  );
+  const completions: KnowledgeItem[] = [];
+  const completionLogs: KnowledgeOperationLog[] = [];
+  for (const entry of distinct.entries) {
+    const existing = existingByNormalized.get(
+      normalizeKnowledgeText(input.languageCode, entry.word),
+    );
+    if (!existing) continue;
+    const built = buildCompletion(existing, entry, sourceLabel, now, aiGenerated);
+    if (!built) continue;
+    completions.push(built.updated);
+    completionLogs.push({
+      id: ctx.ids.next(),
+      learnerId: input.learnerId,
+      operation: 'update',
+      knowledgeItemId: built.updated.id,
+      itemText: built.updated.text,
+      changes: built.changes,
+      source: 'file_upload',
+      note: `导入补全${aiGenerated ? '（AI 生成）' : ''}：只填空，不覆盖已有值`,
+      createdAt: now,
+    });
+  }
+
+  const committed = await ctx.repos.fileImports.commit({
+    wordlist,
+    history,
+    items,
+    states,
+    logs,
+    completions,
+    completionLogs,
+  });
   return {
     duplicateFile: committed.duplicateFile,
     historyId: committed.history.id,
@@ -445,6 +582,7 @@ export async function executeFileImport(
     totalCount: parsed.totalCount,
     addedCount: committed.duplicateFile ? 0 : committed.history.addedCount,
     duplicateCount: committed.duplicateFile ? parsed.entries.length : committed.history.duplicateCount,
+    completedCount: committed.duplicateFile ? 0 : committed.completedCount,
     failedCount: committed.duplicateFile ? 0 : committed.history.failedCount,
     errors: committed.duplicateFile ? [] : committed.history.errors,
   };

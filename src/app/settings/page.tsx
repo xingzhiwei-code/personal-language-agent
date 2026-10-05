@@ -6,6 +6,7 @@ import { NewWordBudgetForm } from '@/components/settings/NewWordBudgetForm';
 import { DEFAULT_DAILY_NEW_WORD_BUDGET } from '@/application/knowledge-pool';
 import { Badge, Card, SectionTitle, formatDateTime } from '@/components/ui';
 import { getTelemetry } from '@/infrastructure/observability/telemetry';
+import { APP_VERSION_LABEL } from '@/config/version';
 import { app } from '@/server/app';
 
 export const dynamic = 'force-dynamic';
@@ -24,7 +25,7 @@ export default async function SettingsPage() {
     <div className="space-y-5">
       <header>
         <h1 className="text-lg font-semibold">设置与数据</h1>
-        <p className="mt-1 text-sm text-ink-600">版本 V0.2 · 单用户 · 本地优先</p>
+        <p className="mt-1 text-sm text-ink-600">版本 {APP_VERSION_LABEL} · 单用户 · 本地优先</p>
       </header>
 
       <Card>

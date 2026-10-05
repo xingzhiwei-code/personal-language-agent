@@ -91,8 +91,9 @@ export function ImportWizard({ goals }: { goals: GoalOption[] }) {
             <div>
               <h2 className="font-semibold">预览：{preview.fileName}</h2>
               <p className="mt-1 text-sm text-ink-600">
-                共 {preview.totalCount} 条 · 预计新增 {preview.estimatedAddedCount} 条 · 重复{' '}
-                {preview.duplicateCount} 条 · 失败 {preview.failedCount} 条
+                共 {preview.totalCount} 条 · 预计新增 {preview.estimatedAddedCount} 条
+                {preview.estimatedCompletedCount > 0 ? <> · 补全 {preview.estimatedCompletedCount} 条</> : null}
+                {' '}· 重复 {preview.duplicateCount} 条 · 失败 {preview.failedCount} 条
               </p>
             </div>
             <Badge tone={preview.duplicateFile ? 'warn' : 'accent'}>
@@ -191,6 +192,10 @@ export function ImportWizard({ goals }: { goals: GoalOption[] }) {
                   </select>
                 </div>
               </div>
+              <label className="flex items-center gap-2 text-sm text-ink-600">
+                <input type="checkbox" name="aiGenerated" className="rounded border-ink-200" />
+                这个文件是 AI 生成的（释义/例句会标注 AI 生成）
+              </label>
               {confirmPending && preview.largeImport ? (
                 <div role="status" className="space-y-1">
                   <progress className="h-2 w-full" />
@@ -211,7 +216,7 @@ export function ImportWizard({ goals }: { goals: GoalOption[] }) {
         <Card className="border-accent-100 bg-accent-50">
           <h2 className="font-semibold text-accent-600">{result.duplicateFile ? '未重复导入' : '导入完成'}</h2>
           <p className="mt-2 text-sm text-ink-600">
-            新增 {result.addedCount} 条，重复跳过 {result.duplicateCount} 条，失败 {result.failedCount} 条。
+            新增 {result.addedCount} 条，补全 {result.completedCount} 条，重复跳过 {result.duplicateCount} 条，失败 {result.failedCount} 条。
           </p>
           <div className="mt-4 flex gap-2">
             <Link href="/knowledge?status=pool" className={buttonStyles.primary}>查看词库池</Link>
