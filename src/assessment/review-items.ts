@@ -75,15 +75,30 @@ export function buildReviewItems(input: BuildReviewItemsInput): ReviewItemSpec[]
     ).slice(0, 3);
 
     if (desired === 'recognition' && meaning && distractors.length === 3) {
-      specs.push({
-        kind: 'review_recognition',
-        modality: 'recognition',
-        subjectId: item.id,
-        prompt: `「${item.text}」的意思是？`,
-        options: shuffle([meaning, ...distractors], random),
-        expectedAnswer: meaning,
-        hint: null,
-      });
+      // Dictation (v0.3 §D2): single words are recognised by ear — TTS plays,
+      // the learner types, graded by fuzzy text match. Multi-word expressions
+      // stay on the four-choice recognition card.
+      if (isSingleWord(item)) {
+        specs.push({
+          kind: 'review_dictation',
+          modality: 'recognition',
+          subjectId: item.id,
+          prompt: '听写你听到的单词',
+          options: shuffle([meaning, ...distractors], random),
+          expectedAnswer: item.text,
+          hint: meaning,
+        });
+      } else {
+        specs.push({
+          kind: 'review_recognition',
+          modality: 'recognition',
+          subjectId: item.id,
+          prompt: `「${item.text}」的意思是？`,
+          options: shuffle([meaning, ...distractors], random),
+          expectedAnswer: meaning,
+          hint: null,
+        });
+      }
       continue;
     }
 
@@ -142,6 +157,11 @@ export function buildReviewItems(input: BuildReviewItemsInput): ReviewItemSpec[]
   }
 
   return specs;
+}
+
+/** Single-token words are dictated; longer expressions use four-choice recognition. */
+function isSingleWord(item: KnowledgeItem): boolean {
+  return item.text.trim().split(/\s+/).length === 1;
 }
 
 /** Replaces the target expression inside an example sentence with a blank. */

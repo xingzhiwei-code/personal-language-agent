@@ -198,8 +198,8 @@ export default async function LearnPage({
       <ActivityRunner
         key={current.id}
         activity={current}
+        item={currentItem}
         alreadyAnswered={current.status !== 'pending'}
-        meaningHint={currentItem?.meaning ?? null}
         sessionId={session.id}
         position={answeredPosition}
         total={progress.total}

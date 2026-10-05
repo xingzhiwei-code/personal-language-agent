@@ -18,6 +18,7 @@ import {
   type SelfRating,
 } from '@/assessment/grading';
 import { buildReviewItems, type ReviewItemSpec } from '@/assessment/review-items';
+import { canRequeue, orderByLadder } from '@/assessment/grouping';
 import { submitAssessment } from './assessment';
 import { appendEvent } from './events';
 import { buildSchedulerSnapshot } from './recommendations';
@@ -141,23 +142,27 @@ export async function startSession(
     input.learnerId,
     specs.map((spec) => spec.subjectId),
   );
-  const activities: LearningActivity[] = [...warmupSpecs, ...specs].map((spec, index) => ({
-    id: ctx.ids.next(),
-    sessionId: session.id,
-    learnerId: input.learnerId,
-    position: index,
-    kind: spec.kind,
-    modality: spec.modality,
-    subjectType: 'knowledge_item',
-    subjectId: spec.subjectId,
-    prompt: spec.prompt,
-    options: spec.options,
-    expectedAnswer: spec.expectedAnswer,
-    hint: spec.hint,
-    status: 'pending',
-    createdAt: now,
-    updatedAt: now,
-  }));
+  // Test questions follow the recognition → recall → production ladder (v0.3 §D2).
+  const orderedTestSpecs = orderByLadder(specs);
+  const activities: LearningActivity[] = [...warmupSpecs, ...orderedTestSpecs].map(
+    (spec, index) => ({
+      id: ctx.ids.next(),
+      sessionId: session.id,
+      learnerId: input.learnerId,
+      position: index,
+      kind: spec.kind,
+      modality: spec.modality,
+      subjectType: 'knowledge_item',
+      subjectId: spec.subjectId,
+      prompt: spec.prompt,
+      options: spec.options,
+      expectedAnswer: spec.expectedAnswer,
+      hint: spec.hint,
+      status: 'pending',
+      createdAt: now,
+      updatedAt: now,
+    }),
+  );
   const events: LearningEvent[] = [
     {
       id: ctx.ids.next(),
@@ -428,7 +433,18 @@ export async function submitActivityAnswer(
 
   let grade: GradeResult | null = null;
   let score: number;
-  if (activity.expectedAnswer && activity.options && activity.options.length > 0) {
+  if (activity.kind === 'review_dictation' && activity.expectedAnswer) {
+    // Dictation (v0.3 §D2): the learner types what they heard. Fuzzy text
+    // match, case/whitespace-insensitive. When the browser lacks TTS the card
+    // falls back to four-choice recognition, whose correct option is `hint`.
+    const answer = (input.answer ?? '').trim();
+    if (activity.options && activity.options.includes(answer)) {
+      grade = gradeChoice(activity.hint ?? activity.expectedAnswer, answer);
+    } else {
+      grade = gradeTextAnswer(languageCode, activity.expectedAnswer, answer);
+    }
+    score = grade.score;
+  } else if (activity.expectedAnswer && activity.options && activity.options.length > 0) {
     grade = gradeChoice(activity.expectedAnswer, input.answer ?? '');
     score = grade.score;
   } else if (activity.expectedAnswer && activity.kind === 'writing_prompt') {
@@ -479,6 +495,13 @@ export async function submitActivityAnswer(
     updatedAt: now,
   });
 
+  // Wrong-answer requeue (v0.3 §D2): a wrong item re-appears later in the
+  // session, but at most MAX_REQUEUE_ROUNDS extra times. After that it stops
+  // (no infinite loop) and is left to the due scheduler.
+  if (score < 0.6 && activity.kind !== 'warmup_exposure') {
+    await requeueWrongSubject(ctx, session.id, input.learnerId, activity, item);
+  }
+
   // NOTE: the session is intentionally NOT completed here. Completing it would
   // re-render the page into the summary and the learner would never see the
   // feedback for their last answer. `getSessionView` + the learn page complete
@@ -492,6 +515,47 @@ export async function submitActivityAnswer(
     view: await getSessionView(ctx, input.learnerId, session.id),
     duplicate: false,
   };
+}
+
+/**
+ * Appends a re-test activity for a subject answered wrong, gated by the 2-round
+ * limit. The re-queued question uses the same test kind so the learner gets one
+ * more chance to answer correctly.
+ */
+async function requeueWrongSubject(
+  ctx: AppContext,
+  sessionId: string,
+  learnerId: string,
+  wrongActivity: LearningActivity,
+  item: KnowledgeItem | null,
+): Promise<void> {
+  const existing = await ctx.repos.activities.listBySession(sessionId);
+  const testAppearances = existing.filter(
+    (activity) =>
+      activity.subjectId === wrongActivity.subjectId && activity.kind !== 'warmup_exposure',
+  ).length;
+  if (!canRequeue(testAppearances)) return;
+
+  const nextPosition = existing.reduce((max, activity) => Math.max(max, activity.position), 0) + 1;
+  const now = ctx.clock.nowIso();
+  const requeue: LearningActivity = {
+    id: ctx.ids.next(),
+    sessionId,
+    learnerId,
+    position: nextPosition,
+    kind: wrongActivity.kind,
+    modality: wrongActivity.modality,
+    subjectType: 'knowledge_item',
+    subjectId: wrongActivity.subjectId,
+    prompt: wrongActivity.prompt,
+    options: wrongActivity.options,
+    expectedAnswer: wrongActivity.expectedAnswer,
+    hint: wrongActivity.hint ?? item?.meaning ?? null,
+    status: 'pending',
+    createdAt: now,
+    updatedAt: now,
+  };
+  await ctx.repos.activities.createMany([requeue]);
 }
 
 /** Skipping is not failure and produces no negative evidence. */

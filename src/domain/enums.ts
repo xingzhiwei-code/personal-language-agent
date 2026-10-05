@@ -138,6 +138,8 @@ export const activityKindSchema = z.enum([
   'chat_turn',
   /** Warmup exposure card: show-only, never assessed (v0.3 §D1). */
   'warmup_exposure',
+  /** Dictation: TTS plays the word, learner types it (v0.3 §D2). */
+  'review_dictation',
 ]);
 export type ActivityKind = z.infer<typeof activityKindSchema>;
 

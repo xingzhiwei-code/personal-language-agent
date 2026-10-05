@@ -9,7 +9,9 @@ import {
 } from '@/app/actions/learning';
 import { MODALITY_LABELS } from '@/components/labels';
 import { Badge, buttonStyles, Card, ErrorNote } from '@/components/ui';
-import type { LearningActivity } from '@/domain/entities';
+import type { KnowledgeItem, LearningActivity } from '@/domain/entities';
+import { phoneticFromNotes, sourceSpanOf } from '@/lib/item-display';
+import { isSupported, speak } from '@/lib/speech';
 import type { ActionResult } from '@/server/app';
 
 type AnswerData = {
@@ -23,17 +25,22 @@ type AnswerData = {
 /**
  * One task at a time (PRD §F-03). The learner can answer, skip, correct the
  * system, or leave — leaving is never framed as failure.
+ *
+ * v0.3 §D2 adds three card shapes:
+ *   - learn_card: word + sound + phonetic + meaning + source_span + self-rating
+ *   - review_dictation: TTS plays the word, learner types it (MCQ fallback)
+ *   - everything else: recognition / recall / production as before.
  */
 export function ActivityRunner({
   activity,
-  meaningHint,
+  item,
   sessionId,
   position,
   total,
   alreadyAnswered = false,
 }: {
   activity: LearningActivity;
-  meaningHint: string | null;
+  item?: KnowledgeItem;
   sessionId: string;
   position: number;
   total: number;
@@ -49,6 +56,7 @@ export function ActivityRunner({
   const [text, setText] = useState('');
 
   const answered = state?.ok === true && state.data !== undefined;
+  const meaningHint = item?.meaning ?? null;
 
   useEffect(() => {
     // Reset local input when a new activity is rendered.
@@ -71,122 +79,302 @@ export function ActivityRunner({
       </div>
 
       <Card>
-        <p className="text-lg leading-relaxed font-medium">{activity.prompt}</p>
-        {activity.hint && !answered ? (
-          <p className="mt-2 text-xs text-ink-400">提示：{activity.hint}</p>
-        ) : null}
-
-        {alreadyAnswered && !answered ? (
-          <div className="mt-5 space-y-3">
-            <p className="rounded-xl bg-ink-50 px-3 py-2 text-sm text-ink-600">
-              这一题你已经答过了。
-              {activity.expectedAnswer ? ` 参考答案：${activity.expectedAnswer}` : ''}
-            </p>
-            <button
-              type="button"
-              onClick={onAdvance}
-              className={buttonStyles.primary}
-              data-testid="next-activity"
-            >
-              下一个
-            </button>
-          </div>
-        ) : !answered ? (
-          <form action={action} className="mt-5 space-y-3">
-            <input type="hidden" name="sessionId" value={sessionId} />
-            <input type="hidden" name="activityId" value={activity.id} />
-
-            {activity.options && activity.options.length > 0 ? (
-              <>
-                <input type="hidden" name="answer" value={choice ?? ''} />
-                <div className="grid gap-2">
-                  {activity.options.map((option) => (
-                    <button
-                      key={option}
-                      type="button"
-                      onClick={() => setChoice(option)}
-                      aria-pressed={choice === option}
-                      className={`rounded-xl border px-3 py-2.5 text-left text-sm transition-colors ${
-                        choice === option
-                          ? 'border-accent-500 bg-accent-50'
-                          : 'border-ink-200 bg-white hover:bg-ink-50'
-                      }`}
-                    >
-                      {option}
-                    </button>
-                  ))}
-                </div>
-                <button
-                  type="submit"
-                  className={buttonStyles.primary}
-                  disabled={pending || choice === null}
-                  data-testid="submit-answer"
-                >
-                  {pending ? '提交中…' : '提交'}
-                </button>
-              </>
-            ) : activity.expectedAnswer ? (
-              <>
-                <label htmlFor="answer" className="block text-sm text-ink-600">
-                  写出你的答案
-                </label>
-                <input
-                  id="answer"
-                  name="answer"
-                  value={text}
-                  onChange={(event) => setText(event.target.value)}
-                  autoComplete="off"
-                  className="w-full rounded-xl border border-ink-200 bg-white px-3 py-2.5 text-sm outline-none"
-                  placeholder="不记得就直接提交，没关系"
-                />
-                <button
-                  type="submit"
-                  className={buttonStyles.primary}
-                  disabled={pending}
-                  data-testid="submit-answer"
-                >
-                  {pending ? '提交中…' : '提交'}
-                </button>
-              </>
-            ) : (
-              <>
-                <p className="text-sm text-ink-600">诚实选一个就好：</p>
-                <div className="flex flex-wrap gap-2">
-                  {(
-                    [
-                      { value: 'forgot', label: '忘了' },
-                      { value: 'unsure', label: '有点印象' },
-                      { value: 'known', label: '记得' },
-                    ] as const
-                  ).map((option) => (
-                    <button
-                      key={option.value}
-                      type="submit"
-                      name="selfRating"
-                      value={option.value}
-                      className={buttonStyles.secondary}
-                      disabled={pending}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-
-            {state && !state.ok ? <ErrorNote>{state.message}</ErrorNote> : null}
-          </form>
-        ) : (
-          <AnswerFeedback
-            data={state.data as AnswerData}
+        {activity.kind === 'review_dictation' && !answered ? (
+          <DictationForm
             activity={activity}
-            meaningHint={meaningHint}
             sessionId={sessionId}
-            onNext={onAdvance}
+            pending={pending}
+            action={action}
+            text={text}
+            setText={setText}
+            choice={choice}
+            setChoice={setChoice}
+            error={state && !state.ok ? state.message : null}
           />
+        ) : (
+          <>
+            <p className="text-lg leading-relaxed font-medium">{activity.prompt}</p>
+            {item ? <ItemContext item={item} /> : null}
+            {activity.hint && !answered ? (
+              <p className="mt-2 text-xs text-ink-400">提示：{activity.hint}</p>
+            ) : null}
+
+            {alreadyAnswered && !answered ? (
+              <div className="mt-5 space-y-3">
+                <p className="rounded-xl bg-ink-50 px-3 py-2 text-sm text-ink-600">
+                  这一题你已经答过了。
+                  {activity.expectedAnswer ? ` 参考答案：${activity.expectedAnswer}` : ''}
+                </p>
+                <button
+                  type="button"
+                  onClick={onAdvance}
+                  className={buttonStyles.primary}
+                  data-testid="next-activity"
+                >
+                  下一个
+                </button>
+              </div>
+            ) : !answered ? (
+              <AnswerForm
+                activity={activity}
+                sessionId={sessionId}
+                pending={pending}
+                action={action}
+                choice={choice}
+                setChoice={setChoice}
+                text={text}
+                setText={setText}
+                error={state && !state.ok ? state.message : null}
+              />
+            ) : (
+              <AnswerFeedback
+                data={state.data as AnswerData}
+                activity={activity}
+                meaningHint={meaningHint}
+                sessionId={sessionId}
+                onNext={onAdvance}
+              />
+            )}
+          </>
         )}
       </Card>
     </div>
+  );
+}
+
+/** Phonetic + source sentence context shown on a study/test card. */
+function ItemContext({ item }: { item: KnowledgeItem }) {
+  const phonetic = phoneticFromNotes(item.notes);
+  const span = sourceSpanOf(item);
+  if (!phonetic && !span) return null;
+  return (
+    <div className="mt-2 space-y-1 text-sm text-ink-600">
+      {phonetic ? <p className="text-ink-400">{phonetic}</p> : null}
+      {span ? (
+        <blockquote className="rounded-xl bg-ink-50 px-3 py-2 text-sm text-ink-600">
+          <p>“{span.text}”</p>
+          {span.source ? <p className="mt-1 text-xs text-ink-400">来自：{span.source}</p> : null}
+        </blockquote>
+      ) : null}
+    </div>
+  );
+}
+
+/** Dictation (v0.3 §D2): TTS plays, learner types. Falls back to four-choice. */
+function DictationForm({
+  activity,
+  sessionId,
+  pending,
+  action,
+  text,
+  setText,
+  choice,
+  setChoice,
+  error,
+}: {
+  activity: LearningActivity;
+  sessionId: string;
+  pending: boolean;
+  action: (formData: FormData) => void;
+  text: string;
+  setText: (value: string) => void;
+  choice: string | null;
+  setChoice: (value: string | null) => void;
+  error: string | null;
+}) {
+  const supported = isSupported();
+  const word = activity.expectedAnswer ?? '';
+
+  useEffect(() => {
+    if (supported) speak(word);
+  }, [supported, word]);
+
+  if (!supported) {
+    // No Web Speech: fall back to four-choice recognition, never an error.
+    return (
+      <form action={action} className="mt-5 space-y-3">
+        <input type="hidden" name="sessionId" value={sessionId} />
+        <input type="hidden" name="activityId" value={activity.id} />
+        <input type="hidden" name="answer" value={choice ?? ''} />
+        <p className="text-sm text-ink-600">当前浏览器不支持发音，改为选择正确释义：</p>
+        <div className="grid gap-2">
+          {(activity.options ?? []).map((option) => (
+            <button
+              key={option}
+              type="button"
+              onClick={() => setChoice(option)}
+              aria-pressed={choice === option}
+              className={`rounded-xl border px-3 py-2.5 text-left text-sm transition-colors ${
+                choice === option
+                  ? 'border-accent-500 bg-accent-50'
+                  : 'border-ink-200 bg-white hover:bg-ink-50'
+              }`}
+            >
+              {option}
+            </button>
+          ))}
+        </div>
+        <button
+          type="submit"
+          className={buttonStyles.primary}
+          disabled={pending || choice === null}
+          data-testid="submit-answer"
+        >
+          {pending ? '提交中…' : '提交'}
+        </button>
+        {error ? <ErrorNote>{error}</ErrorNote> : null}
+      </form>
+    );
+  }
+
+  return (
+    <form action={action} className="mt-5 space-y-3">
+      <input type="hidden" name="sessionId" value={sessionId} />
+      <input type="hidden" name="activityId" value={activity.id} />
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => speak(word)}
+          aria-label={`重播 ${word} 的发音`}
+          className="rounded-full border border-ink-200 px-2.5 py-1.5 text-sm hover:bg-ink-50"
+        >
+          🔊 重播
+        </button>
+        <span className="text-xs text-ink-400">听音，写出你听到的单词</span>
+      </div>
+      <label htmlFor="answer" className="block text-sm text-ink-600">
+        写下你听到的单词
+      </label>
+      <input
+        id="answer"
+        name="answer"
+        value={text}
+        onChange={(event) => setText(event.target.value)}
+        autoComplete="off"
+        autoCapitalize="off"
+        className="w-full rounded-xl border border-ink-200 bg-white px-3 py-2.5 text-sm outline-none"
+        placeholder="不记得就直接提交，没关系"
+      />
+      <button
+        type="submit"
+        className={buttonStyles.primary}
+        disabled={pending}
+        data-testid="submit-answer"
+      >
+        {pending ? '提交中…' : '提交'}
+      </button>
+      {error ? <ErrorNote>{error}</ErrorNote> : null}
+    </form>
+  );
+}
+
+/** The standard answer form: four-choice, free text, or honest self-rating. */
+function AnswerForm({
+  activity,
+  sessionId,
+  pending,
+  action,
+  choice,
+  setChoice,
+  text,
+  setText,
+  error,
+}: {
+  activity: LearningActivity;
+  sessionId: string;
+  pending: boolean;
+  action: (formData: FormData) => void;
+  choice: string | null;
+  setChoice: (value: string | null) => void;
+  text: string;
+  setText: (value: string) => void;
+  error: string | null;
+}) {
+  return (
+    <form action={action} className="mt-5 space-y-3">
+      <input type="hidden" name="sessionId" value={sessionId} />
+      <input type="hidden" name="activityId" value={activity.id} />
+
+      {activity.options && activity.options.length > 0 ? (
+        <>
+          <input type="hidden" name="answer" value={choice ?? ''} />
+          <div className="grid gap-2">
+            {activity.options.map((option) => (
+              <button
+                key={option}
+                type="button"
+                onClick={() => setChoice(option)}
+                aria-pressed={choice === option}
+                className={`rounded-xl border px-3 py-2.5 text-left text-sm transition-colors ${
+                  choice === option
+                    ? 'border-accent-500 bg-accent-50'
+                    : 'border-ink-200 bg-white hover:bg-ink-50'
+                }`}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
+          <button
+            type="submit"
+            className={buttonStyles.primary}
+            disabled={pending || choice === null}
+            data-testid="submit-answer"
+          >
+            {pending ? '提交中…' : '提交'}
+          </button>
+        </>
+      ) : activity.expectedAnswer ? (
+        <>
+          <label htmlFor="answer" className="block text-sm text-ink-600">
+            写出你的答案
+          </label>
+          <input
+            id="answer"
+            name="answer"
+            value={text}
+            onChange={(event) => setText(event.target.value)}
+            autoComplete="off"
+            className="w-full rounded-xl border border-ink-200 bg-white px-3 py-2.5 text-sm outline-none"
+            placeholder="不记得就直接提交，没关系"
+          />
+          <button
+            type="submit"
+            className={buttonStyles.primary}
+            disabled={pending}
+            data-testid="submit-answer"
+          >
+            {pending ? '提交中…' : '提交'}
+          </button>
+        </>
+      ) : (
+        <>
+          <p className="text-sm text-ink-600">诚实选一个就好：</p>
+          <div className="flex flex-wrap gap-2">
+            {(
+              [
+                { value: 'forgot', label: '忘了' },
+                { value: 'unsure', label: '有点印象' },
+                { value: 'known', label: '记得' },
+              ] as const
+            ).map((option) => (
+              <button
+                key={option.value}
+                type="submit"
+                name="selfRating"
+                value={option.value}
+                className={buttonStyles.secondary}
+                disabled={pending}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
+      {error ? <ErrorNote>{error}</ErrorNote> : null}
+    </form>
   );
 }
 
