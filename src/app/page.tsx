@@ -99,6 +99,7 @@ async function HomeContent() {
         <DailyPlan
           recommendations={view.primary ? [view.primary, ...view.alternatives] : []}
           restingToday={view.restingToday}
+          planCounts={view.planCounts}
         />
       ) : (
         <EmptyState

@@ -10,10 +10,12 @@ import { replaceDailyPlan, restDailyPlan, resumeDailyPlan } from '@/application/
 import { createGoalFromText, updateGoal } from '@/application/goals';
 import {
   abandonSession,
+  advanceWarmup,
   completeSession,
   pauseSession,
   resumeSession,
   skipActivity,
+  skipWarmup,
   startSession,
   submitActivityAnswer,
 } from '@/application/sessions';
@@ -187,6 +189,24 @@ export async function skipActivityAction(formData: FormData): Promise<void> {
     sessionId,
     activityId: String(formData.get('activityId') ?? ''),
   });
+  revalidatePath(`/learn/${sessionId}`);
+}
+
+export async function advanceWarmupAction(formData: FormData): Promise<void> {
+  const { ctx, learnerId } = app();
+  const sessionId = String(formData.get('sessionId') ?? '');
+  await advanceWarmup(ctx, {
+    learnerId,
+    sessionId,
+    activityId: String(formData.get('activityId') ?? ''),
+  });
+  revalidatePath(`/learn/${sessionId}`);
+}
+
+export async function skipWarmupAction(formData: FormData): Promise<void> {
+  const { ctx, learnerId } = app();
+  const sessionId = String(formData.get('sessionId') ?? '');
+  await skipWarmup(ctx, { learnerId, sessionId });
   revalidatePath(`/learn/${sessionId}`);
 }
 

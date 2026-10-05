@@ -136,6 +136,8 @@ export const activityKindSchema = z.enum([
   'grammar_choice',
   'writing_prompt',
   'chat_turn',
+  /** Warmup exposure card: show-only, never assessed (v0.3 §D1). */
+  'warmup_exposure',
 ]);
 export type ActivityKind = z.infer<typeof activityKindSchema>;
 
@@ -182,6 +184,8 @@ export const eventTypeSchema = z.enum([
   'context_captured',
   'preference_updated',
   'transfer_reported',
+  /** Warmup exposure finished; payload: { itemIds } (v0.3 §D1). */
+  'warmup_completed',
 ]);
 export type EventType = z.infer<typeof eventTypeSchema>;
 

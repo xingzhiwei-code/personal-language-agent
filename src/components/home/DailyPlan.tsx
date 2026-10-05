@@ -14,9 +14,11 @@ import type { Recommendation } from '@/domain/entities';
 export function DailyPlan({
   recommendations,
   restingToday,
+  planCounts,
 }: {
   recommendations: Recommendation[];
   restingToday: boolean;
+  planCounts: { newCount: number; reviewCount: number } | null;
 }) {
   const [pending, setPending] = useState(false);
   const token = useId();
@@ -45,8 +47,10 @@ export function DailyPlan({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-xs font-medium text-accent-600">今日计划</p>
-          <h2 className="mt-0.5 text-lg font-semibold">约 {totalMinutes} 分钟 · {recommendations.length} 项任务</h2>
-          <p className="mt-1 text-sm text-ink-600">直接从最值得做的一项开始，不需要每天重新配置。</p>
+          <h2 className="mt-0.5 text-lg font-semibold">
+            新学 {planCounts?.newCount ?? 0} · 复习 {planCounts?.reviewCount ?? 0} · 预计 {totalMinutes} 分钟
+          </h2>
+          <p className="mt-1 text-sm text-ink-600">{first.reason}</p>
         </div>
         <Badge tone="accent">本地规则生成</Badge>
       </div>

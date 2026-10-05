@@ -44,6 +44,8 @@ export interface HomeView {
     /** Total knowledge items with at least one measurement. */
     measuredItems: number;
   };
+  /** New vs review split for the startup card (v0.3 §D1). Null when no plan. */
+  planCounts: { newCount: number; reviewCount: number } | null;
   skills: SkillSnapshot[];
 }
 
@@ -104,6 +106,8 @@ export async function getHomeView(ctx: AppContext, learnerId: string): Promise<H
   );
   const skillStates = await ctx.repos.states.listBySubjectType(learnerId, 'skill');
 
+  const planCounts = await computePlanCounts(ctx, learnerId, recommendations);
+
   return {
     hasGoal: !!goal,
     goal,
@@ -122,8 +126,36 @@ export async function getHomeView(ctx: AppContext, learnerId: string): Promise<H
         .length,
       measuredItems: knowledgeStates.filter((state) => state.exposureCount > 0).length,
     },
+    planCounts,
     skills: buildSkillSnapshots(targets, skillStates),
   };
+}
+
+/**
+ * "新学 X / 复习 Y" for the startup card (v0.3 §D1). New = never exposed
+ * (no state or exposureCount 0); review = already exposed. Honest, no made-up
+ * numbers.
+ */
+async function computePlanCounts(
+  ctx: AppContext,
+  learnerId: string,
+  recommendations: Recommendation[],
+): Promise<{ newCount: number; reviewCount: number } | null> {
+  if (recommendations.length === 0) return null;
+  const subjectIds = [
+    ...new Set(recommendations.flatMap((recommendation) => recommendation.subjectIds)),
+  ];
+  if (subjectIds.length === 0) return null;
+  const states = await ctx.repos.states.listBySubjectIds(learnerId, 'knowledge_item', subjectIds);
+  const stateById = new Map(states.map((state) => [state.subjectId, state]));
+  let newCount = 0;
+  let reviewCount = 0;
+  for (const id of subjectIds) {
+    const state = stateById.get(id);
+    if (!state || state.exposureCount === 0) newCount += 1;
+    else reviewCount += 1;
+  }
+  return { newCount, reviewCount };
 }
 
 export function buildSkillSnapshots(

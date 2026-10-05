@@ -8,6 +8,7 @@ import {
 } from '@/app/actions/learning';
 import { completeSession, getSessionView } from '@/application/sessions';
 import { ActivityRunner } from '@/components/learn/ActivityRunner';
+import { WarmupRunner } from '@/components/learn/WarmupRunner';
 import { ACTIVITY_LABELS } from '@/components/labels';
 import { Card, EmptyState, LinkButton, buttonStyles } from '@/components/ui';
 import { DomainError } from '@/domain/errors';
@@ -147,6 +148,27 @@ export default async function LearnPage({
     );
   }
 
+  // Warmup phase (v0.3 §D1): expose new words first, before any testing.
+  const pendingWarmup = view.warmup.nextPending;
+  if (pendingWarmup) {
+    const warmupPosition =
+      view.warmup.activities.filter(
+        (activity) => activity.status !== 'pending' && activity.position < pendingWarmup.position,
+      ).length + 1;
+    return (
+      <div className="space-y-5">
+        <Header title={ACTIVITY_LABELS[session.activityType]} />
+        <WarmupRunner
+          activity={pendingWarmup}
+          item={knowledgeById[pendingWarmup.subjectId]}
+          sessionId={session.id}
+          position={warmupPosition}
+          total={view.warmup.activities.length}
+        />
+      </div>
+    );
+  }
+
   /**
    * The current activity is pinned in the URL (`?a=`). A server action re-render
    * therefore keeps showing the same question, so the learner actually sees the
@@ -163,7 +185,10 @@ export default async function LearnPage({
   const currentItem = knowledgeById[current.subjectId];
   const answeredPosition =
     activities.filter(
-      (activity) => activity.status !== 'pending' && activity.position < current.position,
+      (activity) =>
+        activity.kind !== 'warmup_exposure' &&
+        activity.status !== 'pending' &&
+        activity.position < current.position,
     ).length + 1;
 
   return (

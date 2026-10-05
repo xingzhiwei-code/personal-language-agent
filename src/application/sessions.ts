@@ -38,9 +38,13 @@ export interface StartSessionInput {
 export interface SessionView {
   session: LearningSession;
   activities: LearningActivity[];
+  /** Next pending test activity (warmup cards are tracked separately). */
   nextActivity: LearningActivity | null;
+  /** Progress over test activities only (warmup is exposure, not a task). */
   progress: { answered: number; skipped: number; total: number };
   knowledgeById: Record<string, KnowledgeItem>;
+  /** Warmup phase state (v0.3 §D1). */
+  warmup: { activities: LearningActivity[]; nextPending: LearningActivity | null };
 }
 
 const ITEMS_PER_MINUTE: Record<ActivityType, number> = {
@@ -131,7 +135,13 @@ export async function startSession(
     itemLimit,
     recommendation?.subjectIds ?? [],
   );
-  const activities: LearningActivity[] = specs.map((spec, index) => ({
+  // Warmup (v0.3 §D1): new items are exposed first without being tested.
+  const warmupSpecs = await buildWarmupSpecs(
+    ctx,
+    input.learnerId,
+    specs.map((spec) => spec.subjectId),
+  );
+  const activities: LearningActivity[] = [...warmupSpecs, ...specs].map((spec, index) => ({
     id: ctx.ids.next(),
     sessionId: session.id,
     learnerId: input.learnerId,
@@ -187,7 +197,13 @@ export async function startSession(
     recommendationId: recommendation?.id ?? null,
   });
   if (!committed) throw validationFailed('这个推荐已经开始或失效，请刷新首页');
-  return committed;
+  return {
+    session: committed.session,
+    // Callers treat `activities` as the assessable task list; warmup cards are
+    // exposure-only and tracked through the session view's `warmup` field.
+    activities: committed.activities.filter((activity) => activity.kind !== 'warmup_exposure'),
+    created: committed.created,
+  };
 }
 
 /** Chooses the concrete items for an activity type — deterministic selection. */
@@ -290,6 +306,37 @@ function hashSeed(input: string): number {
   return hash >>> 0;
 }
 
+/**
+ * New items (never exposed) are warmed up before testing (v0.3 §D1). A subject
+ * is "new" when it has no learner state yet or its exposure count is zero.
+ */
+async function buildWarmupSpecs(
+  ctx: AppContext,
+  learnerId: string,
+  subjectIds: string[],
+): Promise<ReviewItemSpec[]> {
+  const unique = [...new Set(subjectIds)];
+  if (unique.length === 0) return [];
+  const states = await ctx.repos.states.listBySubjectIds(learnerId, 'knowledge_item', unique);
+  const stateById = new Map(states.map((state) => [state.subjectId, state]));
+  const newIds = unique.filter((id) => {
+    const state = stateById.get(id);
+    return !state || state.exposureCount === 0;
+  });
+  if (newIds.length === 0) return [];
+  const items = await ctx.repos.knowledge.listByIds(newIds);
+  const itemById = new Map(items.map((item) => [item.id, item]));
+  return newIds.map((id) => ({
+    kind: 'warmup_exposure',
+    modality: 'recognition',
+    subjectId: id,
+    prompt: itemById.get(id)?.text ?? '热身',
+    options: null,
+    expectedAnswer: null,
+    hint: null,
+  }));
+}
+
 export async function getSessionView(
   ctx: AppContext,
   learnerId: string,
@@ -302,17 +349,25 @@ export async function getSessionView(
   const items = await ctx.repos.knowledge.listByIds(
     activities.map((activity) => activity.subjectId),
   );
+  const testActivities = activities.filter((activity) => activity.kind !== 'warmup_exposure');
+  const warmupActivities = activities.filter((activity) => activity.kind === 'warmup_exposure');
 
   return {
     session,
     activities,
-    nextActivity: activities.find((activity) => activity.status === 'pending') ?? null,
+    nextActivity:
+      testActivities.find((activity) => activity.status === 'pending') ?? null,
     progress: {
-      answered: activities.filter((activity) => activity.status === 'answered').length,
-      skipped: activities.filter((activity) => activity.status === 'skipped').length,
-      total: activities.length,
+      answered: testActivities.filter((activity) => activity.status === 'answered').length,
+      skipped: testActivities.filter((activity) => activity.status === 'skipped').length,
+      total: testActivities.length,
     },
     knowledgeById: Object.fromEntries(items.map((item) => [item.id, item])),
+    warmup: {
+      activities: warmupActivities,
+      nextPending:
+        warmupActivities.find((activity) => activity.status === 'pending') ?? null,
+    },
   };
 }
 
@@ -468,6 +523,67 @@ export async function skipActivity(
   return getSessionView(ctx, input.learnerId, input.sessionId);
 }
 
+/**
+ * Marks one warmup exposure card as seen. When the last warmup card is done,
+ * a `warmup_completed` event is recorded (v0.3 §D1) — exposure only, no score.
+ */
+export async function advanceWarmup(
+  ctx: AppContext,
+  input: { learnerId: string; sessionId: string; activityId: string },
+): Promise<SessionView> {
+  const activity = await ctx.repos.activities.findById(input.activityId);
+  if (
+    !activity ||
+    activity.sessionId !== input.sessionId ||
+    activity.kind !== 'warmup_exposure'
+  ) {
+    throw notFound('LearningActivity', input.activityId);
+  }
+  if (activity.status === 'pending') {
+    const now = ctx.clock.nowIso();
+    await ctx.repos.activities.update({ ...activity, status: 'answered', updatedAt: now });
+  }
+  await maybeCompleteWarmup(ctx, input.learnerId, input.sessionId);
+  return getSessionView(ctx, input.learnerId, input.sessionId);
+}
+
+/** Skips the whole warmup phase. Skipping is never failure (v0.3 §D1). */
+export async function skipWarmup(
+  ctx: AppContext,
+  input: { learnerId: string; sessionId: string },
+): Promise<SessionView> {
+  const now = ctx.clock.nowIso();
+  const warmups = (await ctx.repos.activities.listBySession(input.sessionId)).filter(
+    (activity) => activity.kind === 'warmup_exposure' && activity.status === 'pending',
+  );
+  for (const activity of warmups) {
+    await ctx.repos.activities.update({ ...activity, status: 'skipped', updatedAt: now });
+  }
+  await maybeCompleteWarmup(ctx, input.learnerId, input.sessionId);
+  return getSessionView(ctx, input.learnerId, input.sessionId);
+}
+
+async function maybeCompleteWarmup(
+  ctx: AppContext,
+  learnerId: string,
+  sessionId: string,
+): Promise<void> {
+  const activities = await ctx.repos.activities.listBySession(sessionId);
+  const warmups = activities.filter((activity) => activity.kind === 'warmup_exposure');
+  if (warmups.length === 0 || warmups.some((activity) => activity.status === 'pending')) return;
+  const itemIds = warmups
+    .filter((activity) => activity.status === 'answered')
+    .map((activity) => activity.subjectId);
+  await appendEvent(ctx, {
+    learnerId,
+    type: 'warmup_completed',
+    source: 'user',
+    sessionId,
+    idempotencyKey: `warmup-completed:${sessionId}`,
+    payload: { itemIds },
+  });
+}
+
 async function transitionSession(
   ctx: AppContext,
   learnerId: string,
@@ -599,17 +715,20 @@ async function buildSummary(
     failed.map((assessment) => assessment.subjectId),
   );
   const byId = new Map(items.map((item) => [item.id, item]));
+  // Warmup cards are exposure, not tasks: they contribute no score and are not
+  // "skipped" or part of the assessed item set (v0.3 §D1).
+  const testActivities = activities.filter((activity) => activity.kind !== 'warmup_exposure');
 
   return {
     completedItems: assessments.length,
     correctItems: assessments.filter((assessment) => assessment.correct).length,
-    skippedItems: activities.filter((activity) => activity.status === 'skipped').length,
+    skippedItems: testActivities.filter((activity) => activity.status === 'skipped').length,
     difficulties: failed
       .map((assessment) => byId.get(assessment.subjectId)?.text)
       .filter((text): text is string => !!text)
       .slice(0, 10),
     knowledgeItemIds: [
-      ...new Set(activities.map((activity) => activity.subjectId).filter(Boolean)),
+      ...new Set(testActivities.map((activity) => activity.subjectId).filter(Boolean)),
     ].slice(0, 100),
     note,
   };
