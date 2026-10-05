@@ -7,7 +7,7 @@ import type {
   LearningSession,
   SessionSummary,
 } from '@/domain/entities';
-import type { ActivityType, SessionStatus } from '@/domain/enums';
+import type { ActivityType, SessionStatus, SkillKind } from '@/domain/enums';
 import { notFound, validationFailed } from '@/domain/errors';
 import { assertTransition, isResumable, isTerminal } from '@/domain/session-rules';
 import {
@@ -163,6 +163,13 @@ export async function startSession(
       updatedAt: now,
     }),
   );
+  // Capture a skill-mastery snapshot so the settlement page can show "what
+  // changed this session" honestly (v0.3 §D3). Stored in the event payload,
+  // never in a new table.
+  const skillStatesBefore = await ctx.repos.states.listBySubjectType(input.learnerId, 'skill');
+  const masteryBefore = Object.fromEntries(
+    skillStatesBefore.map((state) => [state.subjectId, state.mastery]),
+  );
   const events: LearningEvent[] = [
     {
       id: ctx.ids.next(),
@@ -174,6 +181,7 @@ export async function startSession(
         activityType: input.activityType,
         plannedDurationMinutes: session.plannedDurationMinutes,
         itemCount: activities.length,
+        masteryBefore,
       },
       source: 'user',
       version: 1,
@@ -805,6 +813,36 @@ export async function findResumableSession(
   const session = await ctx.repos.sessions.findResumable(learnerId);
   if (!session) return null;
   return isResumable(session.status) ? session : null;
+}
+
+export interface MasteryChange {
+  skill: SkillKind;
+  before: number;
+  after: number;
+}
+
+/**
+ * Skill-mastery change over a session (v0.3 §D3). "Before" comes from the
+ * snapshot recorded in the session_started event; skills that did not move are
+ * omitted so the UI never fabricates a change.
+ */
+export async function getSessionMasteryChanges(
+  ctx: AppContext,
+  learnerId: string,
+  sessionId: string,
+): Promise<MasteryChange[]> {
+  const events = await ctx.repos.events.listBySession(sessionId);
+  const started = events.find((event) => event.type === 'session_started');
+  const before = (started?.payload.masteryBefore as Record<string, number> | undefined) ?? {};
+  const skillStates = await ctx.repos.states.listBySubjectType(learnerId, 'skill');
+  const changes: MasteryChange[] = [];
+  for (const state of skillStates) {
+    const beforeValue = before[state.subjectId];
+    if (beforeValue !== undefined && Math.abs(state.mastery - beforeValue) >= 0.01) {
+      changes.push({ skill: state.subjectId as SkillKind, before: beforeValue, after: state.mastery });
+    }
+  }
+  return changes;
 }
 
 /** Session-scoped correction toggle ("don't correct my grammar"). */

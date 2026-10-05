@@ -5,11 +5,17 @@ import {
   completeSessionAction,
   pauseSessionAction,
   skipActivityAction,
+  startSessionAction,
 } from '@/app/actions/learning';
-import { completeSession, getSessionView } from '@/application/sessions';
+import {
+  completeSession,
+  getSessionMasteryChanges,
+  getSessionView,
+} from '@/application/sessions';
+import { getCurrentStreak } from '@/application/streak';
 import { ActivityRunner } from '@/components/learn/ActivityRunner';
 import { WarmupRunner } from '@/components/learn/WarmupRunner';
-import { ACTIVITY_LABELS } from '@/components/labels';
+import { ACTIVITY_LABELS, SKILL_LABELS } from '@/components/labels';
 import { Card, EmptyState, LinkButton, buttonStyles } from '@/components/ui';
 import { DomainError } from '@/domain/errors';
 import { app } from '@/server/app';
@@ -70,6 +76,16 @@ export default async function LearnPage({
       view = await getSessionView(ctx, learnerId, sessionId);
     }
     const summary = view.session.summary;
+    const completed = view.session.status === 'completed';
+    const completedItems = summary?.completedItems ?? progress.answered;
+    const correctItems = summary?.correctItems ?? 0;
+    const accuracy =
+      completedItems > 0 ? Math.round((correctItems / completedItems) * 100) : null;
+    const masteryChanges = completed
+      ? await getSessionMasteryChanges(ctx, learnerId, session.id)
+      : [];
+    const streak = completed ? await getCurrentStreak(ctx, learnerId) : null;
+
     return (
       <div className="space-y-5">
         <Header title={`${ACTIVITY_LABELS[session.activityType]}·总结`} />
@@ -82,14 +98,22 @@ export default async function LearnPage({
           <dl className="mt-4 grid grid-cols-3 gap-4 text-sm">
             <div>
               <dt className="text-xs text-ink-400">作答</dt>
-              <dd className="mt-0.5 text-xl font-semibold tabular-nums">
-                {summary?.completedItems ?? progress.answered}
-              </dd>
+              <dd className="mt-0.5 text-xl font-semibold tabular-nums">{completedItems}</dd>
             </div>
             <div>
               <dt className="text-xs text-ink-400">答对</dt>
+              <dd className="mt-0.5 text-xl font-semibold tabular-nums">{correctItems}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-ink-400">正确率</dt>
               <dd className="mt-0.5 text-xl font-semibold tabular-nums">
-                {summary?.correctItems ?? 0}
+                {accuracy === null ? '—' : `${accuracy}%`}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-ink-400">用时</dt>
+              <dd className="mt-0.5 text-xl font-semibold tabular-nums">
+                {sessionDuration(view.session.startedAt, view.session.endedAt)}
               </dd>
             </div>
             <div>
@@ -98,7 +122,27 @@ export default async function LearnPage({
                 {summary?.skippedItems ?? progress.skipped}
               </dd>
             </div>
+            <div>
+              <dt className="text-xs text-ink-400">连续学习</dt>
+              <dd className="mt-0.5 text-xl font-semibold tabular-nums">
+                {completed && streak !== null ? `${streak} 天` : '—'}
+              </dd>
+            </div>
           </dl>
+
+          {masteryChanges.length > 0 ? (
+            <div className="mt-4 border-t border-ink-100 pt-3">
+              <p className="text-xs text-ink-400">这次掌握的技能变化：</p>
+              <ul className="mt-1.5 space-y-1">
+                {masteryChanges.map((change) => (
+                  <li key={change.skill} className="text-sm text-ink-600">
+                    {SKILL_LABELS[change.skill] ?? change.skill}{' '}
+                    {Math.round(change.before * 100)}%→{Math.round(change.after * 100)}%
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
 
           {summary?.difficulties.length ? (
             <div className="mt-4 border-t border-ink-100 pt-3">
@@ -143,6 +187,16 @@ export default async function LearnPage({
             回首页
           </LinkButton>
           <LinkButton href={`/history/${session.id}`}>查看这次记录</LinkButton>
+          {completed ? (
+            <form action={startSessionAction}>
+              <input type="hidden" name="activityType" value="quick_review" />
+              <input type="hidden" name="minutes" value="5" />
+              <input type="hidden" name="clientToken" value={`another-round-${session.id}`} />
+              <button type="submit" className={buttonStyles.secondary}>
+                再来一组复习
+              </button>
+            </form>
+          ) : null}
         </div>
       </div>
     );
@@ -248,4 +302,12 @@ function Header({ title }: { title: string }) {
       </Link>
     </header>
   );
+}
+
+/** Human duration between session start and end, honest and never fabricated. */
+function sessionDuration(startedAt: string | null, endedAt: string | null): string {
+  if (!startedAt || !endedAt) return '—';
+  const minutes = Math.round((Date.parse(endedAt) - Date.parse(startedAt)) / 60_000);
+  if (minutes < 1) return '不到 1 分钟';
+  return `${minutes} 分钟`;
 }
