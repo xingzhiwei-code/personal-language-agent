@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { listKnowledge } from '@/application/knowledge';
+import { listScenarios } from '@/application/scenarios';
 import { KnowledgeForm } from '@/components/knowledge/KnowledgeForm';
 import { KnowledgeTabs } from '@/components/knowledge/KnowledgeTabs';
 import { PoolBrowser } from '@/components/knowledge/PoolBrowser';
@@ -50,6 +51,9 @@ export default async function KnowledgePage({
   const filter = STATUS_FILTERS.find((entry) => entry.value === status) ?? STATUS_FILTERS[0]!;
   const page = Math.max(1, Number.parseInt(pageRaw ?? '1', 10) || 1);
   const wordlists = await ctx.repos.wordlists.listByLearner(learnerId);
+  const scenarios = (await listScenarios(ctx, learnerId)).filter(
+    (scenario) => scenario.status === 'active',
+  );
   const selectedWordlist = wordlists.some((entry) => entry.id === wordlist) ? wordlist : undefined;
   const tags = tag?.trim() ? [tag.trim().toLowerCase()] : undefined;
   const { items, total } = await listKnowledge(ctx, {
@@ -161,6 +165,7 @@ export default async function KnowledgePage({
             <PoolBrowser
               entries={items}
               wordlistNames={Object.fromEntries(wordlists.map((entry) => [entry.id, entry.name]))}
+              scenarios={scenarios.map((scenario) => ({ id: scenario.id, name: scenario.name }))}
             />
           ) : (
             <ul className="space-y-2">

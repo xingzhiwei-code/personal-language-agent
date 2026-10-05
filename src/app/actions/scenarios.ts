@@ -2,9 +2,11 @@
 
 import { revalidatePath } from 'next/cache';
 import {
+  bindItemsToScenario,
   bindWordlistToGoal,
   createScenario,
   deleteScenario,
+  unbindItemFromScenario,
   updateScenario,
 } from '@/application/scenarios';
 import {
@@ -96,6 +98,48 @@ export async function bindWordlistGoalAction(
     });
     revalidateGoalViews();
     return { ok: true, message: '词库绑定已更新' };
+  } catch (error) {
+    return { ok: false, message: toActionError(error) };
+  }
+}
+
+export async function bindItemsToScenarioAction(
+  _previous: ActionResult<{ count: number }> | null,
+  formData: FormData,
+): Promise<ActionResult<{ count: number }>> {
+  try {
+    const { ctx, learnerId } = app();
+    const scenario = await bindItemsToScenario(ctx, {
+      learnerId,
+      scenarioId: String(formData.get('scenarioId') ?? ''),
+      itemIds: formData.getAll('itemId').map(String),
+    });
+    revalidateGoalViews();
+    revalidatePath('/knowledge');
+    return {
+      ok: true,
+      data: { count: scenario.knowledgeItemIds.length },
+      message: `已绑定到「${scenario.name}」`,
+    };
+  } catch (error) {
+    return { ok: false, message: toActionError(error) };
+  }
+}
+
+export async function unbindItemFromScenarioAction(
+  _previous: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  try {
+    const { ctx, learnerId } = app();
+    await unbindItemFromScenario(ctx, {
+      learnerId,
+      scenarioId: String(formData.get('scenarioId') ?? ''),
+      itemId: String(formData.get('itemId') ?? ''),
+    });
+    revalidateGoalViews();
+    revalidatePath('/knowledge');
+    return { ok: true, message: '已移除' };
   } catch (error) {
     return { ok: false, message: toActionError(error) };
   }

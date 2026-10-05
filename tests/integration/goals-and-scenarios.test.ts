@@ -1,10 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createGoalFromText, updateGoal } from '@/application/goals';
+import { createKnowledgeItem } from '@/application/knowledge';
 import {
+  bindItemsToScenario,
   bindWordlistToGoal,
   createScenario,
   deleteScenario,
   listScenarios,
+  unbindItemFromScenario,
   updateScenario,
 } from '@/application/scenarios';
 import type { Wordlist } from '@/domain/entities';
@@ -177,5 +180,54 @@ describe('M6: scenario lifecycle and bindings', () => {
         type: 'small',
       }),
     ).rejects.toThrow('小场景必须选择所属大场景');
+  });
+
+  it('binds and unbinds knowledge items to a scenario (v0.3 §S1)', async () => {
+    const { ctx } = h;
+    const { goal } = await createGoalFromText(ctx, {
+      learnerId: LOCAL_LEARNER_ID,
+      text: '我要准备出国旅行英语',
+    });
+    const scenario = await createScenario(ctx, {
+      learnerId: LOCAL_LEARNER_ID,
+      name: '旅游',
+      type: 'big',
+      goalId: goal.id,
+    });
+    const a = await createKnowledgeItem(ctx, {
+      learnerId: LOCAL_LEARNER_ID,
+      text: 'passport',
+      meaning: '护照',
+    });
+    const b = await createKnowledgeItem(ctx, {
+      learnerId: LOCAL_LEARNER_ID,
+      text: 'boarding pass',
+      meaning: '登机牌',
+    });
+
+    const bound = await bindItemsToScenario(ctx, {
+      learnerId: LOCAL_LEARNER_ID,
+      scenarioId: scenario.id,
+      itemIds: [a.item.id, b.item.id],
+    });
+    expect(bound.knowledgeItemIds).toEqual([a.item.id, b.item.id]);
+
+    // Re-binding the same items is deduplicated.
+    const rebound = await bindItemsToScenario(ctx, {
+      learnerId: LOCAL_LEARNER_ID,
+      scenarioId: scenario.id,
+      itemIds: [a.item.id, b.item.id],
+    });
+    expect(rebound.knowledgeItemIds).toHaveLength(2);
+
+    const unbound = await unbindItemFromScenario(ctx, {
+      learnerId: LOCAL_LEARNER_ID,
+      scenarioId: scenario.id,
+      itemId: a.item.id,
+    });
+    expect(unbound.knowledgeItemIds).toEqual([b.item.id]);
+
+    const persisted = await ctx.repos.scenarios.findById(scenario.id);
+    expect(persisted?.knowledgeItemIds).toEqual([b.item.id]);
   });
 });

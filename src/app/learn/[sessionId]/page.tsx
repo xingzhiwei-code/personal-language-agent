@@ -32,6 +32,7 @@ export default async function LearnPage({
   const { sessionId } = await params;
   const { a: requestedActivityId } = await searchParams;
   const { ctx, learnerId } = app();
+  const aiAvailable = ctx.llm.isConfigured();
 
   let view;
   try {
@@ -254,6 +255,7 @@ export default async function LearnPage({
         activity={current}
         item={currentItem}
         alreadyAnswered={current.status !== 'pending'}
+        aiAvailable={aiAvailable}
         sessionId={session.id}
         position={answeredPosition}
         total={progress.total}

@@ -1,14 +1,16 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useActionState, useEffect, useState } from 'react';
 import {
   createScenarioAction,
   deleteScenarioAction,
+  unbindItemFromScenarioAction,
   updateScenarioAction,
 } from '@/app/actions/scenarios';
 import { Badge, buttonStyles, Card, ErrorNote } from '@/components/ui';
-import type { Goal, Scenario } from '@/domain/entities';
+import type { Goal, KnowledgeItem, Scenario } from '@/domain/entities';
 import type { ActionResult } from '@/server/app';
 
 const TIME_OPTIONS = [
@@ -25,10 +27,12 @@ export function ScenarioManager({
   scenarios,
   goals,
   readiness,
+  knowledgeItems = [],
 }: {
   scenarios: Scenario[];
   goals: Goal[];
   readiness: Record<string, { bound: number; mastery: number }>;
+  knowledgeItems?: KnowledgeItem[];
 }) {
   const router = useRouter();
   const [type, setType] = useState<'big' | 'small'>('big');
@@ -37,6 +41,7 @@ export function ScenarioManager({
     FormData
   >(createScenarioAction, null);
   const bigScenarios = scenarios.filter((scenario) => scenario.type === 'big');
+  const knowledgeById = new Map(knowledgeItems.map((item) => [item.id, item]));
 
   useEffect(() => {
     if (createState?.ok) router.refresh();
@@ -105,10 +110,21 @@ export function ScenarioManager({
         <div className="space-y-3">
           {bigScenarios.map((scenario) => (
             <div key={scenario.id}>
-              <ScenarioEditor scenario={scenario} goals={goals} readiness={readiness[scenario.id]} />
+              <ScenarioEditor
+                scenario={scenario}
+                goals={goals}
+                readiness={readiness[scenario.id]}
+                knowledgeById={knowledgeById}
+              />
               <div className="ml-5 mt-2 space-y-2 border-l-2 border-ink-100 pl-4">
                 {scenarios.filter((child) => child.parentId === scenario.id).map((child) => (
-                  <ScenarioEditor key={child.id} scenario={child} goals={goals} readiness={readiness[child.id]} />
+                  <ScenarioEditor
+                    key={child.id}
+                    scenario={child}
+                    goals={goals}
+                    readiness={readiness[child.id]}
+                    knowledgeById={knowledgeById}
+                  />
                 ))}
               </div>
             </div>
@@ -123,17 +139,23 @@ function ScenarioEditor({
   scenario,
   goals,
   readiness,
+  knowledgeById,
 }: {
   scenario: Scenario;
   goals: Goal[];
   readiness?: { bound: number; mastery: number };
+  knowledgeById: Map<string, KnowledgeItem>;
 }) {
   const router = useRouter();
   const [updateState, updateAction, updating] = useActionState<ActionResult | null, FormData>(updateScenarioAction, null);
   const [deleteState, deleteAction, deleting] = useActionState<ActionResult | null, FormData>(deleteScenarioAction, null);
+  const [unbindState, unbindAction] = useActionState<ActionResult | null, FormData>(
+    unbindItemFromScenarioAction,
+    null,
+  );
   useEffect(() => {
-    if (updateState?.ok || deleteState?.ok) router.refresh();
-  }, [updateState, deleteState, router]);
+    if (updateState?.ok || deleteState?.ok || unbindState?.ok) router.refresh();
+  }, [updateState, deleteState, unbindState, router]);
 
   return (
     <Card className={scenario.status === 'done' ? 'bg-ink-50' : ''}>
@@ -184,6 +206,45 @@ function ScenarioEditor({
           <button type="submit" formAction={deleteAction} className="text-xs text-red-600" disabled={deleting}>删除</button>
         </div>
       </form>
+
+      <div className="mt-4 border-t border-ink-100 pt-3">
+        {scenario.knowledgeItemIds.length === 0 ? (
+          <p className="text-xs text-ink-400">
+            尚未绑定表达，
+            <Link href="/knowledge?status=pool" className="text-accent-600 underline">
+              去词库池挑选
+            </Link>
+            。
+          </p>
+        ) : (
+          <ul className="flex flex-wrap gap-1.5">
+            {scenario.knowledgeItemIds.map((id) => {
+              const item = knowledgeById.get(id);
+              return (
+                <li
+                  key={id}
+                  className="flex items-center gap-1.5 rounded-full border border-ink-200 px-2 py-0.5 text-xs text-ink-600"
+                >
+                  <Link href={`/knowledge/${id}`} className="hover:text-accent-600">
+                    {item?.text ?? id}
+                  </Link>
+                  <form action={unbindAction}>
+                    <input type="hidden" name="scenarioId" value={scenario.id} />
+                    <input type="hidden" name="itemId" value={id} />
+                    <button
+                      type="submit"
+                      className="text-ink-400 hover:text-red-600"
+                      aria-label={`从场景移除 ${item?.text ?? id}`}
+                    >
+                      ×
+                    </button>
+                  </form>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
     </Card>
   );
 }

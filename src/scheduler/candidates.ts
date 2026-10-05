@@ -82,21 +82,24 @@ export function buildCandidates(snapshot: SchedulerSnapshot): Candidate[] {
       friction: 0.35,
       reasonHints: ['用对话把学过的表达真正用出来'],
     });
+  }
 
-    if (snapshot.knowledgeCount > 0) {
-      candidates.push({
-        activityType: 'writing',
-        minMinutes: 4,
-        preferredMinutes: 8,
-        itemsPerMinute: 0.5,
-        maxItems: 4,
-        requiresAi: true,
-        skills: ['writing'],
-        subjectIds: snapshot.knowledgeItemIds,
-        friction: 0.5,
-        reasonHints: ['写出来最能暴露真实的产出差距'],
-      });
-    }
+  // Writing needs no AI key: the deterministic grader checks whether the
+  // learner used the target expression (v0.3 §W1). It is offered with or
+  // without an AI provider; the UI honestly labels the missing AI review.
+  if (snapshot.knowledgeCount > 0) {
+    candidates.push({
+      activityType: 'writing',
+      minMinutes: 4,
+      preferredMinutes: 8,
+      itemsPerMinute: 0.5,
+      maxItems: 4,
+      requiresAi: false,
+      skills: ['writing'],
+      subjectIds: snapshot.knowledgeItemIds,
+      friction: 0.5,
+      reasonHints: ['写出来最能暴露真实的产出差距'],
+    });
   }
 
   // listening / pronunciation are intentionally absent in V0.1:

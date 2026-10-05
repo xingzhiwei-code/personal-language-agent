@@ -110,7 +110,12 @@ export default async function GoalsPage() {
 
       <section>
         <SectionTitle title="场景" hint="只有你手动声明的场景会生效；到期后自动归档" />
-        <ScenarioManager scenarios={scenarios} goals={goalEntities} readiness={scenarioReadiness} />
+        <ScenarioManager
+          scenarios={scenarios}
+          goals={goalEntities}
+          readiness={scenarioReadiness}
+          knowledgeItems={knowledgeItems}
+        />
       </section>
 
       <section>

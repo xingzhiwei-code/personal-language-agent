@@ -148,6 +148,62 @@ export async function listScenarios(ctx: AppContext, learnerId: string): Promise
   return ctx.repos.scenarios.listByLearner(learnerId);
 }
 
+export async function bindItemsToScenario(
+  ctx: AppContext,
+  input: { learnerId: string; scenarioId: string; itemIds: string[] },
+): Promise<Scenario> {
+  const scenario = await ctx.repos.scenarios.findById(input.scenarioId);
+  if (!scenario || scenario.learnerId !== input.learnerId) {
+    throw notFound('Scenario', input.scenarioId);
+  }
+  const ids = [...new Set(input.itemIds.map((id) => id.trim()).filter(Boolean))];
+  if (ids.length === 0) throw validationFailed('请至少选择一条表达');
+  if (ids.length > 100) throw validationFailed('一次最多绑定 100 条');
+  const items = await ctx.repos.knowledge.listByIds(ids);
+  const owned = items.filter((item) => item.learnerId === input.learnerId);
+  const ownedIds = owned.map((item) => item.id);
+  if (ownedIds.length === 0) throw validationFailed('所选表达不存在');
+
+  const merged = [...new Set([...scenario.knowledgeItemIds, ...ownedIds])];
+  const updated: Scenario = {
+    ...scenario,
+    knowledgeItemIds: merged,
+    updatedAt: ctx.clock.nowIso(),
+  };
+  await ctx.repos.scenarios.update(updated);
+  await recordKnowledgeOperation(ctx, {
+    learnerId: input.learnerId,
+    operation: 'goal_binding_changed',
+    source: 'manual',
+    note: `绑定 ${ownedIds.length} 条表达到场景「${scenario.name}」`,
+  });
+  return updated;
+}
+
+export async function unbindItemFromScenario(
+  ctx: AppContext,
+  input: { learnerId: string; scenarioId: string; itemId: string },
+): Promise<Scenario> {
+  const scenario = await ctx.repos.scenarios.findById(input.scenarioId);
+  if (!scenario || scenario.learnerId !== input.learnerId) {
+    throw notFound('Scenario', input.scenarioId);
+  }
+  if (!scenario.knowledgeItemIds.includes(input.itemId)) return scenario;
+  const updated: Scenario = {
+    ...scenario,
+    knowledgeItemIds: scenario.knowledgeItemIds.filter((id) => id !== input.itemId),
+    updatedAt: ctx.clock.nowIso(),
+  };
+  await ctx.repos.scenarios.update(updated);
+  await recordKnowledgeOperation(ctx, {
+    learnerId: input.learnerId,
+    operation: 'goal_binding_changed',
+    source: 'manual',
+    note: `从场景「${scenario.name}」移除表达`,
+  });
+  return updated;
+}
+
 export async function bindWordlistToGoal(
   ctx: AppContext,
   input: { learnerId: string; wordlistId: string; goalId: string | null },

@@ -38,6 +38,7 @@ export function ActivityRunner({
   position,
   total,
   alreadyAnswered = false,
+  aiAvailable = false,
 }: {
   activity: LearningActivity;
   item?: KnowledgeItem;
@@ -46,6 +47,8 @@ export function ActivityRunner({
   total: number;
   /** True when this pinned activity was already answered in a previous visit. */
   alreadyAnswered?: boolean;
+  /** Whether an AI provider is configured (drives honest writing labels). */
+  aiAvailable?: boolean;
 }) {
   const router = useRouter();
   const [state, action, pending] = useActionState<ActionResult<AnswerData> | null, FormData>(
@@ -94,6 +97,11 @@ export function ActivityRunner({
         ) : (
           <>
             <p className="text-lg leading-relaxed font-medium">{activity.prompt}</p>
+            {activity.kind === 'writing_prompt' && !aiAvailable && !answered ? (
+              <p className="mt-2 rounded-xl bg-ink-50 px-3 py-2 text-xs text-ink-600">
+                AI 批改未启用，这次只检查你有没有用上目标表达。
+              </p>
+            ) : null}
             {item ? <ItemContext item={item} /> : null}
             {activity.hint && !answered ? (
               <p className="mt-2 text-xs text-ink-400">提示：{activity.hint}</p>

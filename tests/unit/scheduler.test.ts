@@ -108,6 +108,14 @@ describe('deterministic scheduling', () => {
     expect(scored.length).toBeGreaterThan(0);
   });
 
+  it('still offers writing without an AI provider (deterministic grader, v0.3 §W1)', () => {
+    const scored = scoreCandidates(snapshot({ aiAvailable: false }));
+    const writing = scored.find((candidate) => candidate.activityType === 'writing');
+    expect(writing).toBeDefined();
+    expect(writing?.requiresAi).toBe(false);
+    expect(scored.some((candidate) => candidate.activityType === 'conversation')).toBe(false);
+  });
+
   it('suppresses a just-rejected activity without deleting it forever', () => {
     const scored = scoreCandidates(snapshot({ rejectedActivityTypes: ['quick_review'] }));
     expect(scored[0]?.activityType).not.toBe('quick_review');
