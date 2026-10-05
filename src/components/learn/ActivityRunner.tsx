@@ -26,10 +26,10 @@ type AnswerData = {
  * One task at a time (PRD §F-03). The learner can answer, skip, correct the
  * system, or leave — leaving is never framed as failure.
  *
- * v0.3 §D2 adds three card shapes:
- *   - learn_card: word + sound + phonetic + meaning + source_span + self-rating
+ * v0.3 §D2 adds the dictation card:
  *   - review_dictation: TTS plays the word, learner types it (MCQ fallback)
- *   - everything else: recognition / recall / production as before.
+ *   - everything else: recognition / recall / production as before, now with
+ *     phonetic + source_span context shown when available.
  */
 export function ActivityRunner({
   activity,
