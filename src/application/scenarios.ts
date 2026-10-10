@@ -159,9 +159,14 @@ export async function bindItemsToScenario(
   const ids = [...new Set(input.itemIds.map((id) => id.trim()).filter(Boolean))];
   if (ids.length === 0) throw validationFailed('请至少选择一条表达');
   if (ids.length > 100) throw validationFailed('一次最多绑定 100 条');
+  // `listByIds` has no deterministic ordering (SQLite returns by id index, and
+  // ids are random UUIDs), so re-derive the bound order from the caller's input
+  // instead of the repository's return order. This also scopes to owned items.
   const items = await ctx.repos.knowledge.listByIds(ids);
-  const owned = items.filter((item) => item.learnerId === input.learnerId);
-  const ownedIds = owned.map((item) => item.id);
+  const ownedById = new Map(
+    items.filter((item) => item.learnerId === input.learnerId).map((item) => [item.id, item]),
+  );
+  const ownedIds = ids.filter((id) => ownedById.has(id));
   if (ownedIds.length === 0) throw validationFailed('所选表达不存在');
 
   const merged = [...new Set([...scenario.knowledgeItemIds, ...ownedIds])];
