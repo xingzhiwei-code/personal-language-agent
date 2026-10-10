@@ -63,6 +63,20 @@ async function waitForScreen(page: Page): Promise<Screen> {
   throw new Error('learn page never settled into a known screen');
 }
 
+/**
+ * v0.3 §D1 exposes new (unexposed) items in a warmup phase before any test
+ * question. Skip it when it appears so the tests reach the assessed screen.
+ */
+async function skipWarmupIfPresent(page: Page): Promise<void> {
+  const skip = page.getByTestId('skip-warmup');
+  try {
+    await skip.waitFor({ state: 'visible', timeout: 3000 });
+    await skip.click();
+  } catch {
+    // No warmup phase — the items were already exposed.
+  }
+}
+
 /** Advances past the feedback screen and waits for the next render to land. */
 async function advance(page: Page): Promise<void> {
   const before = page.url();
@@ -77,7 +91,9 @@ async function advance(page: Page): Promise<void> {
 /** Answers the current question. `wrong: true` forces an incorrect answer. */
 async function answerCurrent(page: Page, screen: Screen, wrong: boolean): Promise<void> {
   if (screen === 'typed') {
-    await page.getByLabel('写出你的答案').fill(wrong ? 'zzz-not-the-answer' : 'figure out');
+    // Recall ("写出你的答案") and dictation ("写下你听到的单词") both render a
+    // single text input, so target it generically (v0.3 §D2 added dictation).
+    await page.getByRole('textbox').fill(wrong ? 'zzz-not-the-answer' : 'figure out');
     await page.getByTestId('submit-answer').click();
     return;
   }
@@ -141,6 +157,8 @@ test('完成一次复习 → 看到反馈 → 学习状态更新 → 推荐变�
   await expect(page.getByTestId('start-recommendation')).toBeVisible();
 
   await page.getByTestId('start-quick-review').click();
+  await page.waitForURL(/\/learn\//);
+  await skipWarmupIfPresent(page);
   await expect(page).toHaveURL(/\/learn\/.*\?a=/);
 
   let answered = 0;
@@ -188,6 +206,7 @@ test('中断后可以从首页恢复', async ({ page }) => {
   await page.goto('/');
   await page.getByTestId('start-quick-review').click();
   await expect(page).toHaveURL(/\/learn\//);
+  await skipWarmupIfPresent(page);
 
   await page.getByTestId('pause-session').click();
   await expect(page).toHaveURL('/');
@@ -231,6 +250,7 @@ test('用户纠正系统：判错了可以改回来，不被系统争论', async
   await page.goto('/');
   await page.getByTestId('start-quick-review').click();
   await expect(page).toHaveURL(/\/learn\//);
+  await skipWarmupIfPresent(page);
 
   // Answer wrongly on purpose until the system marks something wrong,
   // then correct it. All three question shapes must be answerable.
@@ -319,7 +339,7 @@ test('文件导入：预览确认后进入词库池，同一文件不可重复�
   await page.getByLabel('词库名称').fill('E2E 测试词库');
   await page.getByRole('button', { name: '确认导入词库池' }).click();
   await expect(page.getByRole('heading', { name: '导入完成' })).toBeVisible();
-  await expect(page.getByText(/新增 2 条，重复跳过 0 条/)).toBeVisible();
+  await expect(page.getByText(/新增 2 条，补全 0 条，重复跳过 0 条/)).toBeVisible();
 
   await page.getByRole('link', { name: '查看词库池' }).click();
   await expect(page.getByText('e2e-alpha')).toBeVisible();
@@ -438,7 +458,7 @@ test('今日计划、预算、换批、休息与词库池手动流转', async ({
 
   await page.goto('/');
   await expect(page.getByText('今日计划', { exact: true })).toBeVisible();
-  await expect(page.getByText(/约 \d+ 分钟 · \d+ 项任务/)).toBeVisible();
+  await expect(page.getByText(/新学 \d+ · 复习 \d+ · 预计 \d+ 分钟/)).toBeVisible();
   await page.getByRole('button', { name: '换一批' }).click();
   await expect(page.getByText('今日计划', { exact: true })).toBeVisible();
 
