@@ -206,8 +206,15 @@ function DictationForm({
   setChoice: (value: string | null) => void;
   error: string | null;
 }) {
-  const supported = isSupported();
+  // Resolve speech support after mount: reading it during render makes SSR
+  // (`false`) and the client's first render (`true`) differ, which breaks
+  // hydration (same root cause as the warmup replay button).
+  const [supported, setSupported] = useState(false);
   const word = activity.expectedAnswer ?? '';
+
+  useEffect(() => {
+    setSupported(isSupported());
+  }, []);
 
   useEffect(() => {
     if (supported) speak(word);

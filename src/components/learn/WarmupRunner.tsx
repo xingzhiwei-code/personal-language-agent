@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { advanceWarmupAction, skipWarmupAction } from '@/app/actions/learning';
 import { phoneticFromNotes, sourceSpanOf } from '@/lib/item-display';
 import { isSupported, speak } from '@/lib/speech';
@@ -28,8 +28,13 @@ export function WarmupRunner({
   const word = item?.text ?? activity.subjectId;
   const phonetic = phoneticFromNotes(item?.notes ?? null);
   const span = item ? sourceSpanOf(item) : null;
+  // Web Speech only exists in the browser. Deciding the replay button during
+  // render makes SSR output (`false`) differ from the client's first render
+  // (`true`) and breaks hydration, so resolve it after mount instead.
+  const [speechSupported, setSpeechSupported] = useState(false);
 
   useEffect(() => {
+    setSpeechSupported(isSupported());
     speak(word);
   }, [word]);
 
@@ -47,7 +52,7 @@ export function WarmupRunner({
       <Card className="text-center">
         <div className="flex items-center justify-center gap-3">
           <p className="text-2xl font-semibold">{word}</p>
-          {isSupported() ? (
+          {speechSupported ? (
             <button
               type="button"
               onClick={replay}
