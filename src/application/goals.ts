@@ -5,6 +5,7 @@ import { createInitialState } from '@/learner/state';
 import { parseGoalInput } from '@/nlu/goal';
 import { recordKnowledgeOperation } from './audit';
 import { appendEvent } from './events';
+import { ensureGoalPhases } from './phases';
 import { LOCAL_LEARNER_ID, type AppContext } from './types';
 
 const DUPLICATE_WINDOW_MS = 60_000;
@@ -161,6 +162,10 @@ export async function createGoalFromText(
     input.learnerId,
     new Date(Date.parse(now) + 1).toISOString(),
   );
+
+  // Generate phases once a starting level exists (v0.4 §G2). No-op when the
+  // learner has not calibrated yet.
+  await ensureGoalPhases(ctx, goal);
 
   if (parsed.availableMinutes || input.availableMinutes) {
     await ctx.repos.preferences.upsertByKey({

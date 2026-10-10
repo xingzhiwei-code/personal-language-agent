@@ -1,8 +1,10 @@
 import { listGoalsWithTargets } from '@/application/goals';
+import { computePhaseProgress, listGoalPhases } from '@/application/phases';
 import { getPlacementView } from '@/application/placement';
 import { listScenarios } from '@/application/scenarios';
 import { GoalForm } from '@/components/GoalForm';
 import { GoalStatusForm } from '@/components/goals/GoalStatusForm';
+import { PhaseList } from '@/components/goals/PhaseList';
 import { ScenarioManager } from '@/components/goals/ScenarioManager';
 import { WordlistGoalBinding } from '@/components/goals/WordlistGoalBinding';
 import { SKILL_LABELS } from '@/components/labels';
@@ -31,6 +33,17 @@ export default async function GoalsPage() {
     ctx.repos.knowledge.search({ learnerId, limit: 20_000 }),
   ]);
   const scenarioReadiness = buildScenarioReadiness(scenarios, knowledgeStates);
+
+  // Phase data (v0.4 §G2) per goal.
+  const phaseData: Record<string, { phases: Awaited<ReturnType<typeof listGoalPhases>>; progress: Record<string, Awaited<ReturnType<typeof computePhaseProgress>>> }> = {};
+  for (const { goal } of goals) {
+    const phases = await listGoalPhases(ctx, goal.id);
+    const progress: Record<string, Awaited<ReturnType<typeof computePhaseProgress>>> = {};
+    for (const phase of phases) {
+      progress[phase.id] = await computePhaseProgress(ctx, learnerId, goal.id, phase);
+    }
+    phaseData[goal.id] = { phases, progress };
+  }
 
   return (
     <div className="space-y-5">
@@ -77,6 +90,9 @@ export default async function GoalsPage() {
                     {STATUS_LABELS[goal.status]}
                   </Badge>
                   {goal.isPrimary ? <Badge tone="accent">主要目标</Badge> : null}
+                  {!goal.isPrimary && goal.status === 'active' ? (
+                    <Badge tone="warn">保温中 · 进度已保留</Badge>
+                  ) : null}
                   {goal.scenarios.map((scenario) => (
                     <Badge key={scenario}>{scenario}</Badge>
                   ))}
@@ -110,6 +126,12 @@ export default async function GoalsPage() {
                 );
               })}
             </div>
+            <PhaseList
+              goalId={goal.id}
+              phases={phaseData[goal.id]?.phases ?? []}
+              progress={phaseData[goal.id]?.progress ?? {}}
+              isPrimary={goal.isPrimary}
+            />
             <GoalCoverage
               goalId={goal.id}
               wordlists={wordlists}

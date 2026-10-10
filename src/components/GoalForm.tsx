@@ -83,6 +83,28 @@ export function GoalForm({ redirectTo = '/' }: { redirectTo?: string }) {
         </select>
       </div>
 
+      <div>
+        <label htmlFor="goal-type" className="block text-sm font-medium text-ink-900">
+          目标类型
+        </label>
+        <p className="mt-0.5 text-xs text-ink-400">决定把目标拆成哪种阶段。留空会自动识别。</p>
+        <select
+          id="goal-type"
+          name="goalType"
+          className="mt-2 rounded-xl border border-ink-200 bg-white px-3 py-2.5 text-sm"
+          defaultValue=""
+        >
+          <option value="">自动识别</option>
+          <option value="ielts">雅思备考</option>
+          <option value="general">通用</option>
+        </select>
+      </div>
+
+      <label className="flex items-center gap-2 text-sm text-ink-600">
+        <input type="checkbox" name="makePrimary" className="rounded border-ink-200" />
+        创建后设为主攻（默认不抢主攻，先放着）
+      </label>
+
       {state && !state.ok ? <ErrorNote>{state.message}</ErrorNote> : null}
 
       <button

@@ -13,6 +13,7 @@ import {
   recordSelfReportPlacement,
   type SelfReportValue,
 } from '@/application/placement';
+import { advancePhase, rollbackPhase, skipPhase } from '@/application/phases';
 import {
   abandonSession,
   advanceWarmup,
@@ -49,6 +50,7 @@ export async function createGoalAction(
   const minutes = minutesRaw.length > 0 ? Number.parseInt(minutesRaw, 10) : null;
   const goalTypeRaw = String(formData.get('goalType') ?? '').trim();
   const goalType = goalTypeRaw === 'ielts' || goalTypeRaw === 'general' ? goalTypeRaw : undefined;
+  const makePrimary = formData.get('makePrimary') === 'on' ? true : undefined;
 
   try {
     const { goal } = await createGoalFromText(ctx, {
@@ -56,6 +58,7 @@ export async function createGoalAction(
       text,
       availableMinutes: Number.isFinite(minutes) ? minutes : null,
       goalType,
+      makePrimary,
     });
     revalidatePath('/');
     revalidatePath('/goals');
@@ -354,6 +357,30 @@ export async function selfReportPlacementAction(
   } catch (error) {
     return { ok: false, message: toActionError(error) };
   }
+}
+
+/** User confirms the suggested move to the next phase (exit criteria met). */
+export async function advancePhaseAction(formData: FormData): Promise<void> {
+  const { ctx, learnerId } = app();
+  await advancePhase(ctx, learnerId, String(formData.get('goalId') ?? ''));
+  revalidatePath('/');
+  revalidatePath('/goals');
+}
+
+/** Manual skip forward (二次确认 handled by the UI). */
+export async function skipPhaseAction(formData: FormData): Promise<void> {
+  const { ctx, learnerId } = app();
+  await skipPhase(ctx, learnerId, String(formData.get('goalId') ?? ''));
+  revalidatePath('/');
+  revalidatePath('/goals');
+}
+
+/** Manual rollback (二次确认 handled by the UI). */
+export async function rollbackPhaseAction(formData: FormData): Promise<void> {
+  const { ctx, learnerId } = app();
+  await rollbackPhase(ctx, learnerId, String(formData.get('goalId') ?? ''));
+  revalidatePath('/');
+  revalidatePath('/goals');
 }
 
 /** Manual override of the starting level (宪法#2 — the user decides). */

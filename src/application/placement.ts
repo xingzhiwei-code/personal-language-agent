@@ -2,6 +2,7 @@ import type { KnowledgeItem, Placement, PlacementSkill } from '@/domain/entities
 import type { ActivityKind, PlacementConfidence, PlacementType } from '@/domain/enums';
 import type { ReviewItemSpec } from '@/assessment/review-items';
 import { appendEvent } from './events';
+import { ensureAllGoalPhases } from './phases';
 import type { AppContext } from './types';
 
 /**
@@ -188,6 +189,9 @@ export async function recordPlacement(
       confidence: input.confidence,
     },
   });
+
+  // A starting level now exists — generate phases for any goal that lacks them.
+  await ensureAllGoalPhases(ctx, input.learnerId);
   return placement;
 }
 
