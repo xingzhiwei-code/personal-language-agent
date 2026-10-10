@@ -22,6 +22,7 @@ export const ACTIVITY_LABELS: Record<ActivityType, string> = {
   grammar_practice: '语法练习',
   writing: '写作练习',
   pronunciation: '发音练习',
+  placement: '水平摸底',
 };
 
 export const SKILL_LABELS: Record<SkillKind, string> = {

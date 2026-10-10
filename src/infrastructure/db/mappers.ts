@@ -8,6 +8,7 @@ import type {
   ImportExportHistory,
   KnowledgeExample,
   KnowledgeItem,
+  GoalPhase,
   KnowledgeOperationLog,
   KnowledgeRelation,
   LearnerState,
@@ -18,6 +19,7 @@ import type {
   LearningTarget,
   Memory,
   ModalityStat,
+  Placement,
   Recommendation,
   RecommendationFactors,
   Scenario,
@@ -26,6 +28,7 @@ import type {
   TransferEvidence,
   User,
   UserContext,
+  WordRelation,
   Wordlist,
 } from '@/domain/entities';
 import type {
@@ -37,6 +40,7 @@ import type {
   EventSource,
   EventType,
   GoalStatus,
+  GoalType,
   Intent,
   KnowledgeEntryMethod,
   KnowledgeOperationType,
@@ -47,6 +51,9 @@ import type {
   Modality,
   OperationStatus,
   OperationType,
+  PhaseStatus,
+  PlacementConfidence,
+  PlacementType,
   ScenarioStatus,
   ScenarioType,
   SessionStatus,
@@ -55,12 +62,15 @@ import type {
   SubjectType,
   TransferEvidenceType,
   Trend,
+  WordRelationSource,
+  WordRelationType,
 } from '@/domain/enums';
 import type {
   assessments,
   chatMessages,
   contentSources,
   contents,
+  goalPhases,
   goals,
   importExportHistory,
   knowledgeItems,
@@ -73,12 +83,14 @@ import type {
   learningSessions,
   learningTargets,
   memories,
+  placements,
   recommendations,
   scenarios,
   transferEvidences,
   userContexts,
   users,
   wordlists,
+  wordRelations,
 } from './schema';
 
 type Row<T extends { $inferSelect: unknown }> = T['$inferSelect'];
@@ -107,6 +119,7 @@ export const toGoal = (row: Row<typeof goals>): Goal => ({
   status: row.status as GoalStatus,
   priority: row.priority,
   isPrimary: row.isPrimary,
+  goalType: (row.goalType ?? 'general') as GoalType,
   createdAt: row.createdAt,
   updatedAt: row.updatedAt,
 });
@@ -427,4 +440,41 @@ export const toScenario = (row: Row<typeof scenarios>): Scenario => ({
   knowledgeItemIds: row.knowledgeItemIds ?? [],
   createdAt: row.createdAt,
   updatedAt: row.updatedAt,
+});
+
+// ── v0.4 mappers ─────────────────────────────────────────────────────────────
+
+export const toPlacement = (row: Row<typeof placements>): Placement => ({
+  id: row.id,
+  learnerId: row.learnerId,
+  type: row.type as PlacementType,
+  skills: (row.skills ?? {}) as Placement['skills'],
+  overallLevel: row.overallLevel,
+  confidence: row.confidence as PlacementConfidence,
+  evidence: (row.evidence ?? []) as Placement['evidence'],
+  createdAt: row.createdAt,
+});
+
+export const toGoalPhase = (row: Row<typeof goalPhases>): GoalPhase => ({
+  id: row.id,
+  goalId: row.goalId,
+  seq: row.seq,
+  name: row.name,
+  description: row.description ?? '',
+  topicSequence: row.topicSequence ?? [],
+  entryCriteria: row.entryCriteria ?? {},
+  exitCriteria: row.exitCriteria ?? {},
+  status: row.status as PhaseStatus,
+  progressCache: row.progressCache ?? {},
+  createdAt: row.createdAt,
+  updatedAt: row.updatedAt,
+});
+
+export const toWordRelation = (row: Row<typeof wordRelations>): WordRelation => ({
+  id: row.id,
+  wordLemma: row.wordLemma,
+  relatedLemma: row.relatedLemma,
+  relationType: row.relationType as WordRelationType,
+  topic: row.topic ?? null,
+  source: row.source as WordRelationSource,
 });

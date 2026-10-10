@@ -23,6 +23,7 @@ const goal: Goal = {
   status: 'active',
   priority: 1,
   isPrimary: true,
+  goalType: 'general',
   createdAt: NOW,
   updatedAt: NOW,
 };

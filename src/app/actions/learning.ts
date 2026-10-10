@@ -9,6 +9,11 @@ import { recordFeedback } from '@/application/feedback';
 import { replaceDailyPlan, restDailyPlan, resumeDailyPlan } from '@/application/daily-plan';
 import { createGoalFromText, updateGoal } from '@/application/goals';
 import {
+  recordPlacementOverride,
+  recordSelfReportPlacement,
+  type SelfReportValue,
+} from '@/application/placement';
+import {
   abandonSession,
   advanceWarmup,
   completeSession,
@@ -42,15 +47,19 @@ export async function createGoalAction(
   const text = String(formData.get('text') ?? '').trim();
   const minutesRaw = String(formData.get('minutes') ?? '').trim();
   const minutes = minutesRaw.length > 0 ? Number.parseInt(minutesRaw, 10) : null;
+  const goalTypeRaw = String(formData.get('goalType') ?? '').trim();
+  const goalType = goalTypeRaw === 'ielts' || goalTypeRaw === 'general' ? goalTypeRaw : undefined;
 
   try {
     const { goal } = await createGoalFromText(ctx, {
       learnerId,
       text,
       availableMinutes: Number.isFinite(minutes) ? minutes : null,
+      goalType,
     });
     revalidatePath('/');
     revalidatePath('/goals');
+    revalidatePath('/placement');
     return { ok: true, data: { goalId: goal.id }, message: '目标已创建' };
   } catch (error) {
     return { ok: false, message: toActionError(error) };
@@ -307,6 +316,61 @@ export async function correctAssessmentAction(
       data: { mastery: result.state.mastery },
       message: '已按你的判断更新',
     };
+  } catch (error) {
+    return { ok: false, message: toActionError(error) };
+  }
+}
+
+/** Starts a level-placement session (v0.4 §G1). */
+export async function startPlacementAction(formData: FormData): Promise<void> {
+  const { ctx, learnerId } = app();
+  const clientToken = String(formData.get('clientToken') ?? `placement-${Date.now()}`);
+  const { session } = await startSession(ctx, {
+    learnerId,
+    activityType: 'placement',
+    plannedDurationMinutes: 10,
+    clientToken,
+  });
+  revalidatePath('/');
+  redirect(`/learn/${session.id}`);
+}
+
+/** Records a self-report starting level (no test), confidence `low`. */
+export async function selfReportPlacementAction(
+  _prev: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const { ctx, learnerId } = app();
+  const value = String(formData.get('value') ?? '') as SelfReportValue;
+  const note = formData.get('note') ? String(formData.get('note')) : null;
+  try {
+    const placement = await recordSelfReportPlacement(ctx, learnerId, value, note);
+    if (!placement) {
+      return { ok: false, message: '请选择一个明确的水平（“不确定”需要先做摸底测试）' };
+    }
+    revalidatePath('/');
+    revalidatePath('/placement');
+    return { ok: true, message: '起点已记录' };
+  } catch (error) {
+    return { ok: false, message: toActionError(error) };
+  }
+}
+
+/** Manual override of the starting level (宪法#2 — the user decides). */
+export async function overridePlacementAction(
+  _prev: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const { ctx, learnerId } = app();
+  const level = Number.parseFloat(String(formData.get('level') ?? ''));
+  try {
+    if (!Number.isFinite(level)) {
+      return { ok: false, message: '请输入一个 0–9 之间的分数' };
+    }
+    await recordPlacementOverride(ctx, learnerId, level);
+    revalidatePath('/');
+    revalidatePath('/placement');
+    return { ok: true, message: '起点已更新' };
   } catch (error) {
     return { ok: false, message: toActionError(error) };
   }

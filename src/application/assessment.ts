@@ -33,6 +33,12 @@ export interface SubmitAssessmentInput {
   idempotencyKey: string;
   /** Overrides the default modality -> skill mapping when known. */
   skills?: SkillKind[];
+  /**
+   * When true, the assessment fact is recorded but the LearnerState (mastery)
+   * is NOT updated. Used by placement sessions — measurement, not learning
+   * (v0.4 §G1).
+   */
+  skipStateUpdate?: boolean;
 }
 
 export interface SubmitAssessmentResult {
@@ -112,6 +118,18 @@ export async function submitAssessment(
     occurredAt: event.occurredAt,
   };
   await ctx.repos.assessments.create(assessment);
+
+  // Placement (v0.4 §G1): record the fact, but never learn from it. Mastery and
+  // skill states must not move on a measurement session.
+  if (input.skipStateUpdate) {
+    const untouched = await loadOrCreateState(
+      ctx,
+      input.learnerId,
+      input.subjectType,
+      input.subjectId,
+    );
+    return { assessment, state: untouched, skillStates: [], created: true };
+  }
 
   const subjectState = await loadOrCreateState(
     ctx,

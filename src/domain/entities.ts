@@ -9,6 +9,7 @@ import {
   eventTypeSchema,
   feedbackKindSchema,
   goalStatusSchema,
+  goalTypeSchema,
   intentSchema,
   knowledgeEntryMethodSchema,
   knowledgeOperationTypeSchema,
@@ -20,6 +21,9 @@ import {
   modalitySchema,
   operationStatusSchema,
   operationTypeSchema,
+  phaseStatusSchema,
+  placementConfidenceSchema,
+  placementTypeSchema,
   scenarioStatusSchema,
   scenarioTypeSchema,
   sessionStatusSchema,
@@ -29,6 +33,8 @@ import {
   timeContextPresetSchema,
   transferEvidenceTypeSchema,
   trendSchema,
+  wordRelationSourceSchema,
+  wordRelationTypeSchema,
 } from './enums';
 import type { Modality } from './enums';
 
@@ -69,6 +75,8 @@ export const goalSchema = z.object({
   status: goalStatusSchema,
   priority: z.number().int().min(1).max(5),
   isPrimary: z.boolean(),
+  /** Drives the phase template (v0.4 §G2). Defaults to `general`. */
+  goalType: goalTypeSchema.default('general'),
   createdAt: timestampSchema,
   updatedAt: timestampSchema,
 });
@@ -571,3 +579,67 @@ export const userFeedbackSchema = z.object({
   note: z.string().max(1000).nullable(),
 });
 export type UserFeedback = z.infer<typeof userFeedbackSchema>;
+
+// ── v0.4 entities ─────────────────────────────────────────────────────────────
+
+/**
+ * A level placement (v0.4 §G1). The learner's starting band is a hypothesis,
+ * not a fact (宪法#8): confidence / evidence / updatedAt make that transparent.
+ * The latest row wins; a placement never overwrites or deletes older ones.
+ */
+export const placementSkillSchema = z.object({
+  vocabulary: z.number().min(0).max(9).nullable(),
+  spelling: z.number().min(0).max(9).nullable(),
+  listening: z.number().min(0).max(9).nullable(),
+  writtenExpression: z.number().min(0).max(9).nullable(),
+});
+export type PlacementSkill = z.infer<typeof placementSkillSchema>;
+
+export const placementSchema = z.object({
+  id: idSchema,
+  learnerId: idSchema,
+  type: placementTypeSchema,
+  /** Four measurable dimensions only (no reading/speaking claims). */
+  skills: placementSkillSchema,
+  /** Overall band on the internal 0–9 scale aligned to IELTS bands. */
+  overallLevel: z.number().min(0).max(9),
+  confidence: placementConfidenceSchema,
+  evidence: z.array(z.enum(['test', 'self_report', 'override'])),
+  createdAt: timestampSchema,
+});
+export type Placement = z.infer<typeof placementSchema>;
+
+/** A stage of a goal (v0.4 §G2). At most one phase is `active` per goal. */
+export const goalPhaseSchema = z.object({
+  id: idSchema,
+  goalId: idSchema,
+  seq: z.number().int().min(1),
+  name: z.string().min(1).max(120),
+  description: z.string().max(1000),
+  /** Ordered topic schedule for the daily-one-topic rotation (v0.4 §G3). */
+  topicSequence: z.array(z.string().min(1).max(40)),
+  /** Deterministic, JSON-computable entry criteria. */
+  entryCriteria: z.record(z.unknown()),
+  /** Deterministic, JSON-computable exit criteria (v0.4 §G2 准出). */
+  exitCriteria: z.record(z.unknown()),
+  status: phaseStatusSchema,
+  /** Cached snapshot of exit-criteria progress for cheap reads. */
+  progressCache: z.record(z.unknown()),
+  createdAt: timestampSchema,
+  updatedAt: timestampSchema,
+});
+export type GoalPhase = z.infer<typeof goalPhaseSchema>;
+
+/**
+ * Offline semantic word relation (v0.4 §G3). Imported once, never LLM-generated
+ * at runtime. Unmatched words are simply absent — never hard-labelled.
+ */
+export const wordRelationSchema = z.object({
+  id: idSchema,
+  wordLemma: z.string().min(1).max(200),
+  relatedLemma: z.string().min(1).max(200),
+  relationType: wordRelationTypeSchema,
+  topic: z.string().max(40).nullable(),
+  source: wordRelationSourceSchema,
+});
+export type WordRelation = z.infer<typeof wordRelationSchema>;

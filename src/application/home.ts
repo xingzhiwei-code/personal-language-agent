@@ -3,6 +3,7 @@ import type {
   LearnerState,
   LearningSession,
   LearningTarget,
+  Placement,
   Recommendation,
   UserContext,
 } from '@/domain/entities';
@@ -47,6 +48,8 @@ export interface HomeView {
   /** New vs review split for the startup card (v0.3 §D1). Null when no plan. */
   planCounts: { newCount: number; reviewCount: number } | null;
   skills: SkillSnapshot[];
+  /** Latest starting-level placement, if any (v0.4 §G1). */
+  placement: Placement | null;
 }
 
 const RECOMMENDATION_REUSE_MS = 10 * 60 * 1000;
@@ -128,6 +131,7 @@ export async function getHomeView(ctx: AppContext, learnerId: string): Promise<H
     },
     planCounts,
     skills: buildSkillSnapshots(targets, skillStates),
+    placement: await ctx.repos.placements.findLatest(learnerId),
   };
 }
 

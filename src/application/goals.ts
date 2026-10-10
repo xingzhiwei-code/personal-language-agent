@@ -1,5 +1,5 @@
 import type { Goal, LearningTarget, User } from '@/domain/entities';
-import type { GoalStatus } from '@/domain/enums';
+import type { GoalStatus, GoalType } from '@/domain/enums';
 import { notFound, validationFailed } from '@/domain/errors';
 import { createInitialState } from '@/learner/state';
 import { parseGoalInput } from '@/nlu/goal';
@@ -30,6 +30,17 @@ export interface CreateGoalInput {
   languageCode?: string;
   makePrimary?: boolean;
   availableMinutes?: number | null;
+  /** Explicit goal type; auto-detected from the text when omitted (v0.4 §G2). */
+  goalType?: GoalType;
+}
+
+/** IELTS keywords, case-insensitive (v0.4 §4 迁移配套). */
+const IELTS_KEYWORDS = [/雅思/i, /ielts/i];
+
+/** Determines the goal type from the title/raw input, defaulting to `general`. */
+export function detectGoalType(title: string, rawInput: string): GoalType {
+  const haystack = `${title} ${rawInput}`;
+  return IELTS_KEYWORDS.some((pattern) => pattern.test(haystack)) ? 'ielts' : 'general';
 }
 
 export interface CreateGoalResult {
@@ -79,6 +90,7 @@ export async function createGoalFromText(
 
   const existingGoals = await ctx.repos.goals.listByLearner(input.learnerId, ['active']);
   const makePrimary = input.makePrimary ?? existingGoals.length === 0;
+  const goalType = input.goalType ?? detectGoalType(parsed.title, text);
   const goal: Goal = {
     id: ctx.ids.next(),
     learnerId: input.learnerId,
@@ -90,6 +102,7 @@ export async function createGoalFromText(
     status: 'active',
     priority: makePrimary ? 1 : Math.min(5, existingGoals.length + 2),
     isPrimary: makePrimary,
+    goalType,
     createdAt: now,
     updatedAt: now,
   };

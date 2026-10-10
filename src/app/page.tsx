@@ -67,6 +67,22 @@ async function HomeContent() {
         </LinkButton>
       </header>
 
+      {!view.placement ? (
+        <Card className="border-accent-100 bg-accent-50/60">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium">还没校准你的起点</p>
+              <p className="mt-0.5 text-xs text-ink-600">
+                测一下（约 10 分钟）或自述水平，好把目标拆成合适的阶段。跳过也没关系。
+              </p>
+            </div>
+            <LinkButton href="/placement" variant="secondary">
+              去校准起点
+            </LinkButton>
+          </div>
+        </Card>
+      ) : null}
+
       {view.resumable ? (
         <Card className="border-amber-200 bg-amber-50/60">
           <div className="flex flex-wrap items-center justify-between gap-3">

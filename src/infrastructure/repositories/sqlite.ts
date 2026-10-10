@@ -5,6 +5,7 @@ import type {
   Content,
   ContentSource,
   Goal,
+  GoalPhase,
   KnowledgeItem,
   KnowledgeRelation,
   LearnerState,
@@ -14,10 +15,12 @@ import type {
   LearningSession,
   LearningTarget,
   Memory,
+  Placement,
   Recommendation,
   TransferEvidence,
   User,
   UserContext,
+  WordRelation,
 } from '@/domain/entities';
 import type {
   ActivityType,
@@ -33,6 +36,7 @@ import type {
   ContentRepository,
   EventRepository,
   FileImportRepository,
+  GoalPhaseRepository,
   GoalRepository,
   ImportExportHistoryRepository,
   KnowledgeOperationLogRepository,
@@ -44,6 +48,7 @@ import type {
   LearnerStateRepository,
   LearningTargetRepository,
   MemoryRepository,
+  PlacementRepository,
   PreferenceRepository,
   RecommendationRepository,
   Repositories,
@@ -54,6 +59,7 @@ import type {
   UserContextRepository,
   UserRepository,
   WordlistRepository,
+  WordRelationRepository,
 } from '@/domain/ports';
 import type { Db } from '../db/client';
 import {
@@ -64,11 +70,13 @@ import {
   toContentSource,
   toEvent,
   toGoal,
+  toGoalPhase,
   toImportExportHistory,
   toKnowledgeItem,
   toKnowledgeOperationLog,
   toLearnerState,
   toMemory,
+  toPlacement,
   toPreference,
   toRecommendation,
   toRelation,
@@ -79,6 +87,7 @@ import {
   toUser,
   toUserContext,
   toWordlist,
+  toWordRelation,
 } from '../db/mappers';
 import * as t from '../db/schema';
 
@@ -1043,6 +1052,9 @@ export function createSqliteRepositories(db: Db): Repositories {
   const knowledgePoolRepo = createKnowledgePoolRepository(db);
   const dataExportRepo = createLearnerDataExportRepository(db);
   const sessionStartsRepo = createSessionStartRepository(db);
+  const placementsRepo = createPlacementRepository(db);
+  const goalPhasesRepo = createGoalPhaseRepository(db);
+  const wordRelationsRepo = createWordRelationRepository(db);
 
   return {
     users,
@@ -1070,7 +1082,16 @@ export function createSqliteRepositories(db: Db): Repositories {
     fileImports: fileImportsRepo,
     knowledgePool: knowledgePoolRepo,
     dataExport: dataExportRepo,
+    placements: placementsRepo,
+    goalPhases: goalPhasesRepo,
+    wordRelations: wordRelationsRepo,
     async deleteAllForLearner(learnerId: string) {
+      const goalRows = db
+        .select({ id: t.goals.id })
+        .from(t.goals)
+        .where(eq(t.goals.learnerId, learnerId))
+        .all();
+      const goalIds = goalRows.map((row) => row.id);
       db.transaction((tx) => {
         tx.delete(t.assessments).where(eq(t.assessments.learnerId, learnerId)).run();
         tx.delete(t.learningEvents).where(eq(t.learningEvents.learnerId, learnerId)).run();
@@ -1089,6 +1110,10 @@ export function createSqliteRepositories(db: Db): Repositories {
         tx.delete(t.learningTargets)
           .where(eq(t.learningTargets.learnerId, learnerId))
           .run();
+        tx.delete(t.placements).where(eq(t.placements.learnerId, learnerId)).run();
+        if (goalIds.length > 0) {
+          tx.delete(t.goalPhases).where(inArray(t.goalPhases.goalId, goalIds)).run();
+        }
         tx.delete(t.goals).where(eq(t.goals.learnerId, learnerId)).run();
         tx.delete(t.memories).where(eq(t.memories.learnerId, learnerId)).run();
         tx.delete(t.learningPreferences)
@@ -1176,6 +1201,11 @@ export function createLearnerDataExportRepository(db: Db): LearnerDataExportRepo
   return {
     async exportAll(learnerId) {
       const [user] = await db.select().from(t.users).where(eq(t.users.id, learnerId)).limit(1);
+      const goalRows = await db
+        .select({ id: t.goals.id })
+        .from(t.goals)
+        .where(eq(t.goals.learnerId, learnerId));
+      const goalIds = goalRows.map((row) => row.id);
       return {
         user: user ?? null,
         goals: await db.select().from(t.goals).where(eq(t.goals.learnerId, learnerId)),
@@ -1202,6 +1232,10 @@ export function createLearnerDataExportRepository(db: Db): LearnerDataExportRepo
         importExportHistory: await db.select().from(t.importExportHistory).where(eq(t.importExportHistory.learnerId, learnerId)),
         knowledgeOperationLog: await db.select().from(t.knowledgeOperationLog).where(eq(t.knowledgeOperationLog.learnerId, learnerId)),
         scenarios: await db.select().from(t.scenarios).where(eq(t.scenarios.learnerId, learnerId)),
+        placements: await db.select().from(t.placements).where(eq(t.placements.learnerId, learnerId)),
+        goalPhases: goalIds.length > 0
+          ? await db.select().from(t.goalPhases).where(inArray(t.goalPhases.goalId, goalIds))
+          : [],
       };
     },
   };
@@ -1643,6 +1677,119 @@ export function createScenarioRepository(db: Db): ScenarioRepository {
     },
     async delete(id) {
       await db.delete(t.scenarios).where(eq(t.scenarios.id, id));
+    },
+  };
+}
+
+// ── v0.4 repository factories ────────────────────────────────────────────────
+
+export function createPlacementRepository(db: Db): PlacementRepository {
+  return {
+    async create(placement: Placement) {
+      await db.insert(t.placements).values(placement);
+      return placement;
+    },
+    async listByLearner(learnerId, limit) {
+      const rows = await db
+        .select()
+        .from(t.placements)
+        .where(eq(t.placements.learnerId, learnerId))
+        .orderBy(desc(t.placements.createdAt))
+        .limit(limit);
+      return rows.map(toPlacement);
+    },
+    async findLatest(learnerId) {
+      const rows = await db
+        .select()
+        .from(t.placements)
+        .where(eq(t.placements.learnerId, learnerId))
+        .orderBy(desc(t.placements.createdAt))
+        .limit(1);
+      return rows.length > 0 ? toPlacement(rows[0]!) : null;
+    },
+  };
+}
+
+export function createGoalPhaseRepository(db: Db): GoalPhaseRepository {
+  return {
+    async createMany(phases: GoalPhase[]) {
+      if (phases.length === 0) return [];
+      await db.insert(t.goalPhases).values(phases);
+      return phases;
+    },
+    async update(phase: GoalPhase) {
+      await db.update(t.goalPhases).set(phase).where(eq(t.goalPhases.id, phase.id));
+      return phase;
+    },
+    async listByGoal(goalId) {
+      const rows = await db
+        .select()
+        .from(t.goalPhases)
+        .where(eq(t.goalPhases.goalId, goalId))
+        .orderBy(asc(t.goalPhases.seq));
+      return rows.map(toGoalPhase);
+    },
+    async findById(id) {
+      const rows = await db.select().from(t.goalPhases).where(eq(t.goalPhases.id, id)).limit(1);
+      return rows.length > 0 ? toGoalPhase(rows[0]!) : null;
+    },
+    async findActiveByGoal(goalId) {
+      const rows = await db
+        .select()
+        .from(t.goalPhases)
+        .where(and(eq(t.goalPhases.goalId, goalId), eq(t.goalPhases.status, 'active')))
+        .limit(1);
+      return rows.length > 0 ? toGoalPhase(rows[0]!) : null;
+    },
+  };
+}
+
+export function createWordRelationRepository(db: Db): WordRelationRepository {
+  return {
+    async upsert(relation: WordRelation) {
+      await db
+        .insert(t.wordRelations)
+        .values(relation)
+        .onConflictDoNothing({ target: t.wordRelations.id });
+      return relation;
+    },
+    async upsertMany(relations: WordRelation[]) {
+      if (relations.length === 0) return [];
+      // Idempotent: unique index dedupes; onConflictDoNothing skips duplicates.
+      for (let offset = 0; offset < relations.length; offset += 500) {
+        await db
+          .insert(t.wordRelations)
+          .values(relations.slice(offset, offset + 500))
+          .onConflictDoNothing({
+            target: [
+              t.wordRelations.wordLemma,
+              t.wordRelations.relatedLemma,
+              t.wordRelations.relationType,
+              t.wordRelations.topic,
+            ],
+          });
+      }
+      return relations;
+    },
+    async listByLemma(wordLemma) {
+      const rows = await db
+        .select()
+        .from(t.wordRelations)
+        .where(eq(t.wordRelations.wordLemma, wordLemma));
+      return rows.map(toWordRelation);
+    },
+    async listByLemmas(wordLemmas) {
+      const unique = [...new Set(wordLemmas)];
+      if (unique.length === 0) return [];
+      const rows = await db
+        .select()
+        .from(t.wordRelations)
+        .where(inArray(t.wordRelations.wordLemma, unique));
+      return rows.map(toWordRelation);
+    },
+    async count() {
+      const rows = await db.select({ value: sql<number>`count(*)` }).from(t.wordRelations);
+      return rows[0]?.value ?? 0;
     },
   };
 }

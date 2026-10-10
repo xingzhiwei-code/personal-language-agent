@@ -4,6 +4,7 @@ import type {
   Content,
   ContentSource,
   Goal,
+  GoalPhase,
   ImportExportHistory,
   KnowledgeItem,
   KnowledgeOperationLog,
@@ -15,11 +16,13 @@ import type {
   LearningSession,
   LearningTarget,
   Memory,
+  Placement,
   Recommendation,
   Scenario,
   TransferEvidence,
   User,
   UserContext,
+  WordRelation,
   Wordlist,
 } from './entities';
 import type {
@@ -302,6 +305,34 @@ export interface ScenarioRepository {
   delete(id: string): Promise<void>;
 }
 
+// ── v0.4 repositories ─────────────────────────────────────────────────────────
+
+export interface PlacementRepository {
+  create(placement: Placement): Promise<Placement>;
+  /** Latest placement for a learner (most recent first, capped by the caller). */
+  listByLearner(learnerId: string, limit: number): Promise<Placement[]>;
+  findLatest(learnerId: string): Promise<Placement | null>;
+}
+
+export interface GoalPhaseRepository {
+  createMany(phases: GoalPhase[]): Promise<GoalPhase[]>;
+  update(phase: GoalPhase): Promise<GoalPhase>;
+  listByGoal(goalId: string): Promise<GoalPhase[]>;
+  findById(id: string): Promise<GoalPhase | null>;
+  findActiveByGoal(goalId: string): Promise<GoalPhase | null>;
+}
+
+export interface WordRelationRepository {
+  /** Upsert is idempotent on (wordLemma, relatedLemma, relationType, topic). */
+  upsert(relation: WordRelation): Promise<WordRelation>;
+  /** Bulk idempotent upsert for the offline import script. */
+  upsertMany(relations: WordRelation[]): Promise<WordRelation[]>;
+  listByLemma(wordLemma: string): Promise<WordRelation[]>;
+  /** Map of lemma -> relations for a batch of lemmas (topic clustering). */
+  listByLemmas(wordLemmas: string[]): Promise<WordRelation[]>;
+  count(): Promise<number>;
+}
+
 export interface FileImportBatch {
   wordlist: Wordlist;
   history: ImportExportHistory;
@@ -371,6 +402,8 @@ export interface LearnerDataSnapshot {
   importExportHistory: unknown[];
   knowledgeOperationLog: unknown[];
   scenarios: unknown[];
+  placements: unknown[];
+  goalPhases: unknown[];
 }
 
 export interface LearnerDataExportRepository {
@@ -406,6 +439,10 @@ export interface Repositories {
   fileImports: FileImportRepository;
   knowledgePool: KnowledgePoolRepository;
   dataExport: LearnerDataExportRepository;
+  // v0.4
+  placements: PlacementRepository;
+  goalPhases: GoalPhaseRepository;
+  wordRelations: WordRelationRepository;
   /** Deletes every row belonging to a learner (data deletion feature). */
   deleteAllForLearner(learnerId: string): Promise<void>;
 }

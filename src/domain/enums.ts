@@ -125,6 +125,8 @@ export const activityTypeSchema = z.enum([
   'grammar_practice',
   'writing',
   'pronunciation',
+  /** Level-placement test (v0.4 §G1): measures, never learns. */
+  'placement',
 ]);
 export type ActivityType = z.infer<typeof activityTypeSchema>;
 
@@ -188,6 +190,14 @@ export const eventTypeSchema = z.enum([
   'transfer_reported',
   /** Warmup exposure finished; payload: { itemIds } (v0.3 §D1). */
   'warmup_completed',
+  /** Level placement finalised; payload: { type, overallLevel, confidence } (v0.4 §G1). */
+  'placement_completed',
+  /** A goal phase became active; payload: { phaseId, seq } (v0.4 §G2). */
+  'phase_started',
+  /** A goal phase was completed; payload: { phaseId, seq } (v0.4 §G2). */
+  'phase_completed',
+  /** User manually skipped/rolled back a phase; payload: { fromSeq, toSeq, direction } (v0.4 §G2). */
+  'phase_override',
 ]);
 export type EventType = z.infer<typeof eventTypeSchema>;
 
@@ -319,3 +329,29 @@ export const feedbackKindSchema = z.enum([
   'assessment_corrected',
 ]);
 export type FeedbackKind = z.infer<typeof feedbackKindSchema>;
+
+// ── v0.4 enums ───────────────────────────────────────────────────────────────
+
+/** Goal type drives the phase template (v0.4 §G2). */
+export const goalTypeSchema = z.enum(['ielts', 'general']);
+export type GoalType = z.infer<typeof goalTypeSchema>;
+
+/** How a placement level was produced (v0.4 §G1). */
+export const placementTypeSchema = z.enum(['test', 'self_report', 'override']);
+export type PlacementType = z.infer<typeof placementTypeSchema>;
+
+/** Honest confidence of a placement estimate (v0.4 §G1, 宪法#8). */
+export const placementConfidenceSchema = z.enum(['high', 'medium', 'low']);
+export type PlacementConfidence = z.infer<typeof placementConfidenceSchema>;
+
+/** Goal phase lifecycle (v0.4 §G2). Exactly one phase is active per goal. */
+export const phaseStatusSchema = z.enum(['locked', 'active', 'done']);
+export type PhaseStatus = z.infer<typeof phaseStatusSchema>;
+
+/** Semantic word relation kinds (v0.4 §G3). */
+export const wordRelationTypeSchema = z.enum(['topic', 'synonym', 'antonym', 'word_family']);
+export type WordRelationType = z.infer<typeof wordRelationTypeSchema>;
+
+/** Provenance of a word relation row (v0.4 §G3). */
+export const wordRelationSourceSchema = z.enum(['wordnet', 'topic_list']);
+export type WordRelationSource = z.infer<typeof wordRelationSourceSchema>;

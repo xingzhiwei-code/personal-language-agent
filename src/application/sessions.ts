@@ -21,6 +21,7 @@ import { buildReviewItems, type ReviewItemSpec } from '@/assessment/review-items
 import { canRequeue, orderByLadder } from '@/assessment/grouping';
 import { submitAssessment } from './assessment';
 import { appendEvent } from './events';
+import { buildPlacementSpecs, finalizePlacementFromSession } from './placement';
 import { buildSchedulerSnapshot } from './recommendations';
 import type { AppContext } from './types';
 
@@ -57,6 +58,7 @@ const ITEMS_PER_MINUTE: Record<ActivityType, number> = {
   conversation: 0,
   listening: 0,
   pronunciation: 0,
+  placement: 1.5,
 };
 
 export async function startSession(
@@ -129,21 +131,28 @@ export async function startSession(
       Math.round((plannedDurationMinutes ?? 5) * (ITEMS_PER_MINUTE[input.activityType] || 0)),
     );
 
-  const specs = await planActivities(
-    ctx,
-    input.learnerId,
-    input.activityType,
-    itemLimit,
-    recommendation?.subjectIds ?? [],
-  );
+  const isPlacement = input.activityType === 'placement';
+  const specs = isPlacement
+    ? await buildPlacementSpecs(ctx, input.learnerId)
+    : await planActivities(
+        ctx,
+        input.learnerId,
+        input.activityType,
+        itemLimit,
+        recommendation?.subjectIds ?? [],
+      );
   // Warmup (v0.3 §D1): new items are exposed first without being tested.
-  const warmupSpecs = await buildWarmupSpecs(
-    ctx,
-    input.learnerId,
-    specs.map((spec) => spec.subjectId),
-  );
+  // Placement is measurement only — no warmup, and its four-dimension order is
+  // fixed (vocabulary → spelling → listening → writing), not ladder-reordered.
+  const warmupSpecs = isPlacement
+    ? []
+    : await buildWarmupSpecs(
+        ctx,
+        input.learnerId,
+        specs.map((spec) => spec.subjectId),
+      );
   // Test questions follow the recognition → recall → production ladder (v0.3 §D2).
-  const orderedTestSpecs = orderByLadder(specs);
+  const orderedTestSpecs = isPlacement ? specs : orderByLadder(specs);
   const activities: LearningActivity[] = [...warmupSpecs, ...orderedTestSpecs].map(
     (spec, index) => ({
       id: ctx.ids.next(),
@@ -492,6 +501,8 @@ export async function submitActivityAnswer(
     source: 'user',
     // Stable key: one activity can only ever produce one assessment.
     idempotencyKey: `activity-answer:${activity.id}`,
+    // Placement measures, never learns (v0.4 §G1).
+    skipStateUpdate: session.activityType === 'placement',
   });
 
   const now = ctx.clock.nowIso();
@@ -768,6 +779,12 @@ export async function completeSession(
     idempotencyKey: `session-completed:${session.id}`,
     payload: { ...summary },
   });
+
+  // Placement session (v0.4 §G1): finalise the level estimate once completed.
+  // Idempotent on the session id, and never part of the streak/mastery path.
+  if (session.activityType === 'placement') {
+    await finalizePlacementFromSession(ctx, input.learnerId, session.id);
+  }
 
   return { session, summary };
 }

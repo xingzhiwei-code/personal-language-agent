@@ -35,6 +35,8 @@ export function computeStreak(completedDayKeys: readonly string[], todayKey: str
 export async function getCurrentStreak(ctx: AppContext, learnerId: string): Promise<number> {
   const completed = await ctx.repos.sessions.listByLearner(learnerId, 2000, ['completed']);
   const dayKeys = completed
+    // Placement is measurement, not learning — it never counts (v0.4 §G1).
+    .filter((session) => session.activityType !== 'placement')
     .map((session) => session.endedAt ?? session.updatedAt)
     .map(localDayKey);
   return computeStreak(dayKeys, localDayKey(ctx.clock.nowIso()));

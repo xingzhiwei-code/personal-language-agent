@@ -12,6 +12,7 @@ import {
   getSessionMasteryChanges,
   getSessionView,
 } from '@/application/sessions';
+import { getPlacementView } from '@/application/placement';
 import { getCurrentStreak } from '@/application/streak';
 import { ActivityRunner } from '@/components/learn/ActivityRunner';
 import { WarmupRunner } from '@/components/learn/WarmupRunner';
@@ -86,6 +87,8 @@ export default async function LearnPage({
       ? await getSessionMasteryChanges(ctx, learnerId, session.id)
       : [];
     const streak = completed ? await getCurrentStreak(ctx, learnerId) : null;
+    const isPlacement = session.activityType === 'placement';
+    const placementView = isPlacement ? await getPlacementView(ctx, learnerId) : null;
 
     return (
       <div className="space-y-5">
@@ -94,7 +97,9 @@ export default async function LearnPage({
           <p className="text-sm text-ink-600">
             {view.session.status === 'abandoned'
               ? '这次提前结束了——完全没问题，记录都保存好了。'
-              : '这次完成了。下面是实际发生的事，不是打分。'}
+              : isPlacement
+                ? '这次水平摸底完成了。下面是实测的四科粗估，不是打分，也不影响你的学习数据。'
+                : '这次完成了。下面是实际发生的事，不是打分。'}
           </p>
           <dl className="mt-4 grid grid-cols-3 gap-4 text-sm">
             <div>
@@ -126,10 +131,32 @@ export default async function LearnPage({
             <div>
               <dt className="text-xs text-ink-400">连续学习</dt>
               <dd className="mt-0.5 text-xl font-semibold tabular-nums">
-                {completed && streak !== null ? `${streak} 天` : '—'}
+                {isPlacement ? '—' : completed && streak !== null ? `${streak} 天` : '—'}
               </dd>
             </div>
           </dl>
+
+          {isPlacement && placementView?.placement ? (
+            <div className="mt-4 border-t border-ink-100 pt-3">
+              <p className="text-xs text-ink-400">实测四科粗估（内部 0–9 分，对齐雅思分数）：</p>
+              <dl className="mt-2 grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
+                <PlacementStat label="词汇" value={placementView.placement.skills.vocabulary} />
+                <PlacementStat label="拼写" value={placementView.placement.skills.spelling} />
+                <PlacementStat label="听辨" value={placementView.placement.skills.listening} />
+                <PlacementStat label="书面表达" value={placementView.placement.skills.writtenExpression} />
+              </dl>
+              <p className="mt-3 text-sm text-ink-600">
+                综合起点约{' '}
+                <span className="font-semibold tabular-nums">
+                  {placementView.placement.overallLevel}
+                </span>{' '}
+                分 · 摸底估算 · 置信度中
+              </p>
+              <p className="mt-1 text-xs text-ink-400">
+                水平摸底不计连续天数、不影响掌握度。可在“目标 → 重新校准起点”重测或调整。
+              </p>
+            </div>
+          ) : null}
 
           {masteryChanges.length > 0 ? (
             <div className="mt-4 border-t border-ink-100 pt-3">
@@ -312,4 +339,14 @@ function sessionDuration(startedAt: string | null, endedAt: string | null): stri
   const minutes = Math.round((Date.parse(endedAt) - Date.parse(startedAt)) / 60_000);
   if (minutes < 1) return '不到 1 分钟';
   return `${minutes} 分钟`;
+}
+
+/** One measured placement dimension; null means "not measured", never "0". */
+function PlacementStat({ label, value }: { label: string; value: number | null }) {
+  return (
+    <div>
+      <dt className="text-xs text-ink-400">{label}</dt>
+      <dd className="mt-0.5 text-xl font-semibold tabular-nums">{value ?? '—'}</dd>
+    </div>
+  );
 }

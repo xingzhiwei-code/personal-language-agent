@@ -102,6 +102,7 @@ describe('M2: file import workflow', () => {
       status: 'active',
       priority: 1,
       isPrimary: true,
+      goalType: 'general',
       createdAt: now,
       updatedAt: now,
     };

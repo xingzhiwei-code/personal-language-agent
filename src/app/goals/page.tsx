@@ -1,11 +1,12 @@
 import { listGoalsWithTargets } from '@/application/goals';
+import { getPlacementView } from '@/application/placement';
 import { listScenarios } from '@/application/scenarios';
 import { GoalForm } from '@/components/GoalForm';
 import { GoalStatusForm } from '@/components/goals/GoalStatusForm';
 import { ScenarioManager } from '@/components/goals/ScenarioManager';
 import { WordlistGoalBinding } from '@/components/goals/WordlistGoalBinding';
 import { SKILL_LABELS } from '@/components/labels';
-import { Badge, Card, EmptyState, Meter, SectionTitle } from '@/components/ui';
+import { Badge, Card, EmptyState, LinkButton, Meter, SectionTitle } from '@/components/ui';
 import type { KnowledgeItem, LearnerState, Scenario, Wordlist } from '@/domain/entities';
 import { app } from '@/server/app';
 
@@ -21,6 +22,7 @@ export default async function GoalsPage() {
   const { ctx, learnerId } = app();
   const goals = await listGoalsWithTargets(ctx, learnerId);
   const goalEntities = goals.map(({ goal }) => goal);
+  const placementView = await getPlacementView(ctx, learnerId);
   const [skillStates, knowledgeStates, scenarios, wordlists, knowledgeItems] = await Promise.all([
     ctx.repos.states.listBySubjectType(learnerId, 'skill'),
     ctx.repos.states.listBySubjectType(learnerId, 'knowledge_item'),
@@ -38,6 +40,29 @@ export default async function GoalsPage() {
           目标和技能权重都可以改。系统对你的能力估计只是假设，你可以随时纠正。
         </p>
       </header>
+
+      <Card>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <span className="text-xs text-ink-400">当前起点</span>
+            <span className="ml-2 text-xl font-semibold tabular-nums">
+              {placementView.placement ? placementView.placement.overallLevel : '未校准'}
+            </span>
+            {placementView.placement ? (
+              <span className="ml-2 text-xs text-ink-400">
+                {placementView.placement.evidence.includes('override')
+                  ? '手动覆盖'
+                  : placementView.placement.evidence.includes('test')
+                    ? '摸底估算'
+                    : '自述'}
+              </span>
+            ) : null}
+          </div>
+          <LinkButton href="/placement" variant="secondary">
+            {placementView.placement ? '重新校准起点' : '校准起点'}
+          </LinkButton>
+        </div>
+      </Card>
 
       {goals.length === 0 ? (
         <EmptyState title="还没有目标" description="用一句话描述你想达到什么。" />
