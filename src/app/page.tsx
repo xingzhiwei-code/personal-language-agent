@@ -6,6 +6,7 @@ import { resumeSessionAction, startSessionAction } from '@/app/actions/learning'
 import { GoalForm } from '@/components/GoalForm';
 import { DailyPlan } from '@/components/home/DailyPlan';
 import { IntentInput } from '@/components/home/IntentInput';
+import { PathBar } from '@/components/home/PathBar';
 import { ACTIVITY_LABELS, SKILL_LABELS, TREND_LABELS } from '@/components/labels';
 import {
   Badge,
@@ -111,11 +112,16 @@ async function HomeContent() {
 
       {timeNote ? <InfoNote>{timeNote}</InfoNote> : null}
 
+      {view.phases.length > 0 ? (
+        <PathBar phases={view.phases} progress={view.phaseProgress} />
+      ) : null}
+
       {view.primary || view.restingToday ? (
         <DailyPlan
           recommendations={view.primary ? [view.primary, ...view.alternatives] : []}
           restingToday={view.restingToday}
           planCounts={view.planCounts}
+          startupReason={view.startupReason}
         />
       ) : (
         <EmptyState

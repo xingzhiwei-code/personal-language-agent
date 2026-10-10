@@ -15,10 +15,13 @@ export function DailyPlan({
   recommendations,
   restingToday,
   planCounts,
+  startupReason,
 }: {
   recommendations: Recommendation[];
   restingToday: boolean;
   planCounts: { newCount: number; reviewCount: number } | null;
+  /** Upgraded one-line startup explanation (v0.4 §G4). */
+  startupReason?: string | null;
 }) {
   const [pending, setPending] = useState(false);
   const token = useId();
@@ -50,7 +53,7 @@ export function DailyPlan({
           <h2 className="mt-0.5 text-lg font-semibold">
             新学 {planCounts?.newCount ?? 0} · 复习 {planCounts?.reviewCount ?? 0} · 预计 {totalMinutes} 分钟
           </h2>
-          <p className="mt-1 text-sm text-ink-600">{first.reason}</p>
+          <p className="mt-1 text-sm text-ink-600">{startupReason ?? first.reason}</p>
         </div>
         <Badge tone="accent">本地规则生成</Badge>
       </div>

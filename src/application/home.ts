@@ -1,5 +1,6 @@
 import type {
   Goal,
+  GoalPhase,
   LearnerState,
   LearningSession,
   LearningTarget,
@@ -11,6 +12,8 @@ import type { SkillKind, Trend } from '@/domain/enums';
 import { getCurrentContext } from './context';
 import { isRestingToday } from './daily-plan';
 import { ensureLearner } from './goals';
+import { computePhaseProgress, listGoalPhases, type PhaseProgress } from './phases';
+import { buildStartupReason } from './reasoning';
 import { generateRecommendations } from './recommendations';
 import { findResumableSession } from './sessions';
 import type { AppContext } from './types';
@@ -50,6 +53,11 @@ export interface HomeView {
   skills: SkillSnapshot[];
   /** Latest starting-level placement, if any (v0.4 §G1). */
   placement: Placement | null;
+  /** Upgraded one-line startup reason (v0.4 §G4). */
+  startupReason: string | null;
+  /** Primary goal's phases + the active phase's progress (v0.4 §G5). */
+  phases: GoalPhase[];
+  phaseProgress: Record<string, PhaseProgress>;
 }
 
 const RECOMMENDATION_REUSE_MS = 10 * 60 * 1000;
@@ -111,6 +119,22 @@ export async function getHomeView(ctx: AppContext, learnerId: string): Promise<H
 
   const planCounts = await computePlanCounts(ctx, learnerId, recommendations);
 
+  // v0.4 §G4 / §G5: upgraded startup reason + path data. Only the active
+  // phase's progress is computed (locked/done phases need no live numbers).
+  let startupReason: string | null = null;
+  let phases: GoalPhase[] = [];
+  const phaseProgress: Record<string, PhaseProgress> = {};
+  if (goal) {
+    phases = await listGoalPhases(ctx, goal.id);
+    const active = phases.find((phase) => phase.status === 'active');
+    if (active) {
+      phaseProgress[active.id] = await computePhaseProgress(ctx, learnerId, goal.id, active);
+    }
+  }
+  if (recommendations[0]) {
+    startupReason = await buildStartupReason(ctx, learnerId, recommendations[0]);
+  }
+
   return {
     hasGoal: !!goal,
     goal,
@@ -132,6 +156,9 @@ export async function getHomeView(ctx: AppContext, learnerId: string): Promise<H
     planCounts,
     skills: buildSkillSnapshots(targets, skillStates),
     placement: await ctx.repos.placements.findLatest(learnerId),
+    startupReason,
+    phases,
+    phaseProgress,
   };
 }
 
