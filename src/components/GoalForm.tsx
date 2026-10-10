@@ -85,7 +85,7 @@ export function GoalForm({ redirectTo = '/' }: { redirectTo?: string }) {
 
       <div>
         <label htmlFor="goal-type" className="block text-sm font-medium text-ink-900">
-          目标类型
+          目标分类
         </label>
         <p className="mt-0.5 text-xs text-ink-400">决定把目标拆成哪种阶段。留空会自动识别。</p>
         <select
