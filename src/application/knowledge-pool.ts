@@ -10,6 +10,7 @@ import { scorePoolRelevance, type ScoredPoolItem } from '@/scheduler/relevance';
 import { appendEvent } from './events';
 import { localDayKey } from './local-day';
 import { listScenarios } from './scenarios';
+import { getCurrentTopic, getTopicLemmas, lemmaOf } from './topic';
 import type { AppContext } from './types';
 
 export const DEFAULT_DAILY_NEW_WORD_BUDGET = 10;
@@ -21,6 +22,10 @@ export interface PoolPromotionResult {
   scored: ScoredPoolItem[];
   budget: number;
   reason: string | null;
+  /** Today's topic (v0.4 §G3), or null when there is no active phase. */
+  topic: string | null;
+  /** How many of the promoted words were filled outside the topic (fallback). */
+  fallbackCount: number;
 }
 
 /**
@@ -32,14 +37,18 @@ export async function ensureDailyPoolPromotion(
   learnerId: string,
 ): Promise<PoolPromotionResult> {
   const budget = await getDailyNewWordBudget(ctx, learnerId);
-  if (budget === 0) return { promoted: [], scored: [], budget, reason: null };
+  if (budget === 0) {
+    return { promoted: [], scored: [], budget, reason: null, topic: null, fallbackCount: 0 };
+  }
   const now = ctx.clock.nowIso();
   const poolItems = await ctx.repos.knowledge.search({
     learnerId,
     statuses: ['new'],
     limit: 20_000,
   });
-  if (poolItems.length === 0) return { promoted: [], scored: [], budget, reason: null };
+  if (poolItems.length === 0) {
+    return { promoted: [], scored: [], budget, reason: null, topic: null, fallbackCount: 0 };
+  }
 
   const goal = await ctx.repos.goals.findPrimary(learnerId);
   const [targets, skillStates, wordlists, relations, knowledgeStates, activeScenarios] =
@@ -69,23 +78,59 @@ export async function ensureDailyPoolPromotion(
     activeScenarios,
     nowIso: now,
   });
-  const selected = scored.slice(0, budget);
+
+  // Daily-one-topic (v0.4 §G3): new words are drawn from today's topic first.
+  // When the topic has too few words, the remainder is filled by the general
+  // relevance order and honestly annotated (never fabricated).
+  const topic = await getCurrentTopic(ctx, learnerId);
+  let selected: ScoredPoolItem[];
+  let fallbackCount = 0;
+  if (topic) {
+    const topicLemmas = new Set((await getTopicLemmas(ctx, topic)).map(lemmaOf));
+    const topicScored = scored.filter((entry) => topicLemmas.has(lemmaOf(entry.item.text)));
+    const nonTopicScored = scored.filter((entry) => !topicLemmas.has(lemmaOf(entry.item.text)));
+    // Within-group order: topic words first (core + relations), then fallback.
+    selected = [...topicScored, ...nonTopicScored].slice(0, budget);
+    fallbackCount = Math.max(0, selected.length - topicScored.length);
+  } else {
+    selected = scored.slice(0, budget);
+  }
+
   const promoted = await commitPromotion(ctx, {
     learnerId,
     selected,
     mode: 'automatic',
     automaticBudget: { dayKey: localDayKey(now), budget },
+    topic,
+    fallbackCount,
   });
   const selectedById = new Map(scored.map((entry) => [entry.item.id, entry]));
   const promotedScored = promoted
     .map((item) => selectedById.get(item.id))
     .filter((entry): entry is ScoredPoolItem => entry !== undefined);
+  const reason = buildPromotionReason(topic, fallbackCount, promotedScored[0]?.reason ?? null);
   return {
     promoted,
     scored: promotedScored,
     budget,
-    reason: promotedScored[0]?.reason ?? null,
+    reason,
+    topic,
+    fallbackCount,
   };
+}
+
+/** Honest promotion reason with the topic and any fallback (v0.4 §G3). */
+function buildPromotionReason(
+  topic: string | null,
+  fallbackCount: number,
+  baseReason: string | null,
+): string | null {
+  if (!topic) return baseReason;
+  if (fallbackCount > 0) {
+    const prefix = `今日「${topic}」话题词不足，按通用推荐补齐 ${fallbackCount} 个`;
+    return baseReason ? `${prefix}；${baseReason}` : prefix;
+  }
+  return `今日主题「${topic}」${baseReason ? `；${baseReason}` : ''}`;
 }
 
 export async function promoteKnowledgeItems(
@@ -172,6 +217,8 @@ async function commitPromotion(
     selected: ScoredPoolItem[];
     mode: 'automatic' | 'manual';
     automaticBudget?: { dayKey: string; budget: number };
+    topic?: string | null;
+    fallbackCount?: number;
   },
 ): Promise<KnowledgeItem[]> {
   if (input.selected.length === 0) return [];
@@ -203,7 +250,15 @@ async function commitPromotion(
     sessionId: null,
     type: 'knowledge_pool_promoted',
     occurredAt: now,
-    payload: { mode: input.mode, dayKey: localDayKey(now), itemIds: [], count: 0 },
+    payload: {
+      mode: input.mode,
+      dayKey: localDayKey(now),
+      itemIds: [],
+      count: 0,
+      // v0.4 §G4: topic written into the entry context for gap aggregation.
+      topic: input.topic ?? null,
+      fallbackCount: input.fallbackCount ?? 0,
+    },
     source: input.mode === 'automatic' ? 'system' : 'user',
     version: 1,
     idempotencyKey:

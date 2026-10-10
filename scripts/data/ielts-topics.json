@@ -1,0 +1,15 @@
+{
+  "_source": "Curated IELTS topic vocabulary. Topics are the standard IELTS writing/speaking themes (education, technology, environment, health, work, travel, culture, science). Word lists compiled from common IELTS vocabulary references; unmatched words are never hard-labelled at runtime.",
+  "topics": {
+    "daily_life": ["routine", "household", "leisure", "commute", "habit", "schedule", "chore", "neighborhood", "grocery", "errand"],
+    "education": ["curriculum", "syllabus", "enroll", "tuition", "scholarship", "literacy", "pedagogy", "undergraduate", "postgraduate", "discipline"],
+    "technology": ["innovation", "automation", "digital", "device", "breakthrough", "gadget", "obsolete", "artificial", "software", "network"],
+    "environment": ["pollution", "sustainable", "conservation", "ecosystem", "renewable", "emission", "biodiversity", "climate", "recycle", "deforestation"],
+    "health": ["nutrition", "obesity", "epidemic", "immunity", "therapy", "diagnosis", "sedentary", "wellbeing", "symptom", "recovery"],
+    "work": ["employment", "career", "promotion", "colleague", "profession", "unemployment", "salary", "workplace", "deadline", "recruit"],
+    "travel": ["destination", "itinerary", "tourism", "excursion", "accommodation", "reservation", "sightseeing", "baggage", "visa", "boarding"],
+    "culture": ["heritage", "tradition", "custom", "diversity", "identity", "globalization", "festival", "ritual", "artifact", "bilingual"],
+    "science": ["hypothesis", "experiment", "theory", "evidence", "research", "phenomenon", "analysis", "discovery", "laboratory", "methodology"],
+    "society": ["community", "welfare", "inequality", "urbanization", "demographic", "migration", "poverty", "policy", "citizen", "public"]
+  }
+}

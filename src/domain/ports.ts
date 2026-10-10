@@ -323,13 +323,15 @@ export interface GoalPhaseRepository {
 }
 
 export interface WordRelationRepository {
-  /** Upsert is idempotent on (wordLemma, relatedLemma, relationType, topic). */
+  /** Upsert is idempotent on the deterministic primary key. */
   upsert(relation: WordRelation): Promise<WordRelation>;
   /** Bulk idempotent upsert for the offline import script. */
   upsertMany(relations: WordRelation[]): Promise<WordRelation[]>;
   listByLemma(wordLemma: string): Promise<WordRelation[]>;
-  /** Map of lemma -> relations for a batch of lemmas (topic clustering). */
+  /** Relations for a batch of lemmas (card labels / clustering). */
   listByLemmas(wordLemmas: string[]): Promise<WordRelation[]>;
+  /** Topic relations (`relationType='topic'`) for one topic label. */
+  listByTopic(topic: string): Promise<WordRelation[]>;
   count(): Promise<number>;
 }
 

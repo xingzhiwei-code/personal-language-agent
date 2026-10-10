@@ -14,6 +14,7 @@ import {
 } from '@/application/sessions';
 import { getPlacementView } from '@/application/placement';
 import { getCurrentStreak } from '@/application/streak';
+import { getLemmaRelations, lemmaOf } from '@/application/topic';
 import { ActivityRunner } from '@/components/learn/ActivityRunner';
 import { WarmupRunner } from '@/components/learn/WarmupRunner';
 import { ACTIVITY_LABELS, SKILL_LABELS } from '@/components/labels';
@@ -265,6 +266,11 @@ export default async function LearnPage({
 
   const current = pinned;
   const currentItem = knowledgeById[current.subjectId];
+  const currentRelations = currentItem
+    ? (await getLemmaRelations(ctx, [lemmaOf(currentItem.text)]).then((map) =>
+        map.get(lemmaOf(currentItem.text)) ?? [],
+      ))
+    : [];
   const answeredPosition =
     activities.filter(
       (activity) =>
@@ -286,6 +292,7 @@ export default async function LearnPage({
         sessionId={session.id}
         position={answeredPosition}
         total={progress.total}
+        relations={currentRelations}
       />
 
       <div className="flex flex-wrap items-center gap-2 border-t border-ink-100 pt-4">

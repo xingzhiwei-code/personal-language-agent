@@ -1755,19 +1755,13 @@ export function createWordRelationRepository(db: Db): WordRelationRepository {
     },
     async upsertMany(relations: WordRelation[]) {
       if (relations.length === 0) return [];
-      // Idempotent: unique index dedupes; onConflictDoNothing skips duplicates.
+      // Idempotent on the primary key: callers supply a deterministic id
+      // (hash of the relation tuple) so re-running never duplicates.
       for (let offset = 0; offset < relations.length; offset += 500) {
         await db
           .insert(t.wordRelations)
           .values(relations.slice(offset, offset + 500))
-          .onConflictDoNothing({
-            target: [
-              t.wordRelations.wordLemma,
-              t.wordRelations.relatedLemma,
-              t.wordRelations.relationType,
-              t.wordRelations.topic,
-            ],
-          });
+          .onConflictDoNothing({ target: t.wordRelations.id });
       }
       return relations;
     },
@@ -1785,6 +1779,18 @@ export function createWordRelationRepository(db: Db): WordRelationRepository {
         .select()
         .from(t.wordRelations)
         .where(inArray(t.wordRelations.wordLemma, unique));
+      return rows.map(toWordRelation);
+    },
+    async listByTopic(topic) {
+      const rows = await db
+        .select()
+        .from(t.wordRelations)
+        .where(
+          and(
+            eq(t.wordRelations.relationType, 'topic'),
+            eq(t.wordRelations.topic, topic),
+          ),
+        );
       return rows.map(toWordRelation);
     },
     async count() {

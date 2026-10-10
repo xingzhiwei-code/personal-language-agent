@@ -9,6 +9,7 @@ import type {
   SkillKind,
   SourceType,
   Trend,
+  WordRelationType,
 } from '@/domain/enums';
 
 /** Chinese UI labels for domain enums. Shared by server and client components. */
@@ -109,6 +110,13 @@ export const TREND_LABELS: Record<Trend, string> = {
   stable: '稳定',
   declining: '有下降',
   unknown: '数据还不够',
+};
+
+export const WORD_RELATION_LABELS: Record<WordRelationType, string> = {
+  topic: '话题',
+  synonym: '同义',
+  antonym: '反义',
+  word_family: '同族',
 };
 
 export const FACTOR_LABELS: Record<string, string> = {

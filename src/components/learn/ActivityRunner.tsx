@@ -7,9 +7,9 @@ import {
   feedbackAction,
   submitAnswerAction,
 } from '@/app/actions/learning';
-import { MODALITY_LABELS } from '@/components/labels';
+import { MODALITY_LABELS, WORD_RELATION_LABELS } from '@/components/labels';
 import { Badge, buttonStyles, Card, ErrorNote } from '@/components/ui';
-import type { KnowledgeItem, LearningActivity } from '@/domain/entities';
+import type { KnowledgeItem, LearningActivity, WordRelation } from '@/domain/entities';
 import { phoneticFromNotes, sourceSpanOf } from '@/lib/item-display';
 import { isSupported, speak } from '@/lib/speech';
 import type { ActionResult } from '@/server/app';
@@ -39,6 +39,7 @@ export function ActivityRunner({
   total,
   alreadyAnswered = false,
   aiAvailable = false,
+  relations = [],
 }: {
   activity: LearningActivity;
   item?: KnowledgeItem;
@@ -49,6 +50,8 @@ export function ActivityRunner({
   alreadyAnswered?: boolean;
   /** Whether an AI provider is configured (drives honest writing labels). */
   aiAvailable?: boolean;
+  /** Read-only semantic relation tags (v0.4 §G3). */
+  relations?: WordRelation[];
 }) {
   const router = useRouter();
   const [state, action, pending] = useActionState<ActionResult<AnswerData> | null, FormData>(
@@ -102,7 +105,7 @@ export function ActivityRunner({
                 AI 批改未启用，这次只检查你有没有用上目标表达。
               </p>
             ) : null}
-            {item ? <ItemContext item={item} /> : null}
+            {item ? <ItemContext item={item} relations={relations} /> : null}
             {activity.hint && !answered ? (
               <p className="mt-2 text-xs text-ink-400">提示：{activity.hint}</p>
             ) : null}
@@ -150,11 +153,14 @@ export function ActivityRunner({
   );
 }
 
-/** Phonetic + source sentence context shown on a study/test card. */
-function ItemContext({ item }: { item: KnowledgeItem }) {
+/** Phonetic + source sentence + read-only relation tags shown on a card. */
+function ItemContext({ item, relations }: { item: KnowledgeItem; relations: WordRelation[] }) {
   const phonetic = phoneticFromNotes(item.notes);
   const span = sourceSpanOf(item);
-  if (!phonetic && !span) return null;
+  const tags = relations
+    .filter((relation) => relation.relationType !== 'topic')
+    .slice(0, 2);
+  if (!phonetic && !span && tags.length === 0) return null;
   return (
     <div className="mt-2 space-y-1 text-sm text-ink-600">
       {phonetic ? <p className="text-ink-400">{phonetic}</p> : null}
@@ -163,6 +169,16 @@ function ItemContext({ item }: { item: KnowledgeItem }) {
           <p>“{span.text}”</p>
           {span.source ? <p className="mt-1 text-xs text-ink-400">来自：{span.source}</p> : null}
         </blockquote>
+      ) : null}
+      {tags.length > 0 ? (
+        <p className="text-xs text-ink-400">
+          {tags.map((relation) => (
+            <span key={relation.id} className="mr-2">
+              {relation.relationType === 'antonym' ? '↔' : '·'}{' '}
+              {WORD_RELATION_LABELS[relation.relationType]}：{relation.relatedLemma}
+            </span>
+          ))}
+        </p>
       ) : null}
     </div>
   );
