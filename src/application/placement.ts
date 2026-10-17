@@ -1,7 +1,9 @@
 import type { KnowledgeItem, Placement, PlacementSkill } from '@/domain/entities';
 import type { ActivityKind, PlacementConfidence, PlacementType } from '@/domain/enums';
 import type { ReviewItemSpec } from '@/assessment/review-items';
+import { AUTO_CALIBRATION_PREFERENCE_KEY } from '@/config/v05';
 import { appendEvent } from './events';
+import { setPreference } from './memory';
 import { ensureAllGoalPhases } from './phases';
 import type { AppContext } from './types';
 
@@ -222,7 +224,7 @@ export async function recordPlacementOverride(
   overallLevel: number,
 ): Promise<Placement | null> {
   const clamped = Math.max(0, Math.min(9, overallLevel));
-  return recordPlacement(ctx, {
+  const placement = await recordPlacement(ctx, {
     learnerId,
     type: 'override',
     skills: { vocabulary: null, spelling: null, listening: null, writtenExpression: null },
@@ -231,6 +233,16 @@ export async function recordPlacementOverride(
     evidence: ['override'],
     idempotencyKey: `placement:override:${ctx.clock.nowIso()}`,
   });
+  // A manual override always wins: pause auto-calibration until re-enabled (v0.5 §W3).
+  if (placement) {
+    await setPreference(ctx, {
+      learnerId,
+      key: AUTO_CALIBRATION_PREFERENCE_KEY,
+      value: 'false',
+      source: 'user_explicit',
+    });
+  }
+  return placement;
 }
 
 /**

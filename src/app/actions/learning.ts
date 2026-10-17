@@ -4,6 +4,11 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import type { SelfRating } from '@/assessment/grading';
 import { correctAssessment } from '@/application/assessment';
+import {
+  acknowledgeAutoCalibration,
+  applyAutoCalibration,
+  setAutoCalibrationEnabled,
+} from '@/application/auto-calibration';
 import { captureContext } from '@/application/context';
 import { recordFeedback } from '@/application/feedback';
 import { replaceDailyPlan, restDailyPlan, resumeDailyPlan } from '@/application/daily-plan';
@@ -30,6 +35,7 @@ import {
   activityTypeSchema,
   goalStatusSchema,
   type FeedbackKind,
+  type PlacementConfidence,
 } from '@/domain/enums';
 import { validationFailed } from '@/domain/errors';
 import {
@@ -401,4 +407,34 @@ export async function overridePlacementAction(
   } catch (error) {
     return { ok: false, message: toActionError(error) };
   }
+}
+
+/** Toggles the "adaptive starting point" switch (v0.5 §W3). */
+export async function setAutoCalibrationAction(formData: FormData): Promise<void> {
+  const { ctx, learnerId } = app();
+  const enabled = String(formData.get('enabled') ?? '') === 'true';
+  await setAutoCalibrationEnabled(ctx, learnerId, enabled);
+  revalidatePath('/');
+  revalidatePath('/goals');
+}
+
+/** Applies the user-confirmed calibration suggestion (更新, v0.5 §W3). */
+export async function applyAutoCalibrationAction(formData: FormData): Promise<void> {
+  const { ctx, learnerId } = app();
+  const value = Number.parseFloat(String(formData.get('value') ?? ''));
+  const confidence = String(formData.get('confidence') ?? 'low') as PlacementConfidence;
+  if (!Number.isFinite(value)) return;
+  await applyAutoCalibration(ctx, learnerId, value, confidence);
+  revalidatePath('/');
+  revalidatePath('/goals');
+}
+
+/** Records "保持不变" so the same suggestion is not re-surfaced (v0.5 §W3). */
+export async function acknowledgeAutoCalibrationAction(formData: FormData): Promise<void> {
+  const { ctx, learnerId } = app();
+  const value = Number.parseFloat(String(formData.get('value') ?? ''));
+  if (!Number.isFinite(value)) return;
+  await acknowledgeAutoCalibration(ctx, learnerId, value);
+  revalidatePath('/');
+  revalidatePath('/goals');
 }

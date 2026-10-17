@@ -604,7 +604,7 @@ export const placementSchema = z.object({
   /** Overall band on the internal 0–9 scale aligned to IELTS bands. */
   overallLevel: z.number().min(0).max(9),
   confidence: placementConfidenceSchema,
-  evidence: z.array(z.enum(['test', 'self_report', 'override'])),
+  evidence: z.array(z.enum(['test', 'self_report', 'override', 'auto_calibration'])),
   createdAt: timestampSchema,
 });
 export type Placement = z.infer<typeof placementSchema>;

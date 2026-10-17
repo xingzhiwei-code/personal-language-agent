@@ -336,8 +336,14 @@ export type FeedbackKind = z.infer<typeof feedbackKindSchema>;
 export const goalTypeSchema = z.enum(['ielts', 'general']);
 export type GoalType = z.infer<typeof goalTypeSchema>;
 
-/** How a placement level was produced (v0.4 §G1). */
-export const placementTypeSchema = z.enum(['test', 'self_report', 'override']);
+/** How a placement level was produced (v0.4 §G1, v0.5 §W3). */
+export const placementTypeSchema = z.enum([
+  'test',
+  'self_report',
+  'override',
+  /** Auto-calibration from learning data, applied only after user confirmation (v0.5 §W3). */
+  'auto_calibration',
+]);
 export type PlacementType = z.infer<typeof placementTypeSchema>;
 
 /** Honest confidence of a placement estimate (v0.4 §G1, 宪法#8). */

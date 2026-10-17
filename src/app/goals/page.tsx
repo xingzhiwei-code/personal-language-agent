@@ -1,8 +1,10 @@
 import { listGoalsWithTargets } from '@/application/goals';
+import { basedOnLabel, getAutoCalibrationView } from '@/application/auto-calibration';
 import { computePhaseProgress, listGoalPhases } from '@/application/phases';
 import { getPlacementView } from '@/application/placement';
 import { listScenarios } from '@/application/scenarios';
 import { GoalForm } from '@/components/GoalForm';
+import { AutoCalibrationPanel } from '@/components/goals/AutoCalibrationPanel';
 import { GoalStatusForm } from '@/components/goals/GoalStatusForm';
 import { PhaseList } from '@/components/goals/PhaseList';
 import { ScenarioManager } from '@/components/goals/ScenarioManager';
@@ -25,6 +27,7 @@ export default async function GoalsPage() {
   const goals = await listGoalsWithTargets(ctx, learnerId);
   const goalEntities = goals.map(({ goal }) => goal);
   const placementView = await getPlacementView(ctx, learnerId);
+  const autoCalibration = await getAutoCalibrationView(ctx, learnerId);
   const [skillStates, knowledgeStates, scenarios, wordlists, knowledgeItems] = await Promise.all([
     ctx.repos.states.listBySubjectType(learnerId, 'skill'),
     ctx.repos.states.listBySubjectType(learnerId, 'knowledge_item'),
@@ -75,6 +78,30 @@ export default async function GoalsPage() {
             {placementView.placement ? '重新校准起点' : '校准起点'}
           </LinkButton>
         </div>
+
+        <div className="mt-4 border-t border-ink-100 pt-3">
+          <AutoCalibrationPanel
+            enabled={autoCalibration.enabled}
+            suggestion={autoCalibration.suggestion}
+          />
+        </div>
+
+        {autoCalibration.history.length > 0 ? (
+          <div className="mt-4 border-t border-ink-100 pt-3">
+            <p className="text-xs text-ink-400">校准历史（只读，不可删改）</p>
+            <ol className="mt-2 space-y-1">
+              {autoCalibration.history.map((placement) => (
+                <li key={placement.id} className="text-xs text-ink-600">
+                  <span className="tabular-nums">{placement.createdAt.slice(0, 10)}</span>
+                  {' · 更新为 '}
+                  <span className="font-medium tabular-nums">{placement.overallLevel}</span>
+                  {' · 依据 '}
+                  {basedOnLabel()}
+                </li>
+              ))}
+            </ol>
+          </div>
+        ) : null}
       </Card>
 
       {goals.length === 0 ? (
