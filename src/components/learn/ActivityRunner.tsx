@@ -77,11 +77,26 @@ export function ActivityRunner({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between text-xs text-ink-400">
-        <span>
-          第 {position} / {total} 个
-        </span>
-        <Badge>{MODALITY_LABELS[activity.modality]}</Badge>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between text-xs text-ink-400">
+          <span>
+            第 {position} / {total} 个
+          </span>
+          <Badge>{MODALITY_LABELS[activity.modality]}</Badge>
+        </div>
+        <div
+          className="meter-track w-full"
+          role="progressbar"
+          aria-valuenow={position}
+          aria-valuemin={1}
+          aria-valuemax={Math.max(1, total)}
+          aria-label="学习进度"
+        >
+          <div
+            className="meter-fill"
+            style={{ width: `${Math.round((position / Math.max(1, total)) * 100)}%` }}
+          />
+        </div>
       </div>
 
       <Card>
@@ -101,7 +116,7 @@ export function ActivityRunner({
           <>
             <p className="text-lg leading-relaxed font-medium">{activity.prompt}</p>
             {activity.kind === 'writing_prompt' && !aiAvailable && !answered ? (
-              <p className="mt-2 rounded-xl bg-ink-50 px-3 py-2 text-xs text-ink-600">
+              <p className="glass-soft mt-2 rounded-xl px-3 py-2 text-xs text-ink-600">
                 AI 批改未启用，这次只检查你有没有用上目标表达。
               </p>
             ) : null}
@@ -112,7 +127,7 @@ export function ActivityRunner({
 
             {alreadyAnswered && !answered ? (
               <div className="mt-5 space-y-3">
-                <p className="rounded-xl bg-ink-50 px-3 py-2 text-sm text-ink-600">
+                <p className="glass-soft rounded-xl px-3 py-2 text-sm text-ink-600">
                   这一题你已经答过了。
                   {activity.expectedAnswer ? ` 参考答案：${activity.expectedAnswer}` : ''}
                 </p>
@@ -165,7 +180,7 @@ function ItemContext({ item, relations }: { item: KnowledgeItem; relations: Word
     <div className="mt-2 space-y-1 text-sm text-ink-600">
       {phonetic ? <p className="text-ink-400">{phonetic}</p> : null}
       {span ? (
-        <blockquote className="rounded-xl bg-ink-50 px-3 py-2 text-sm text-ink-600">
+        <blockquote className="glass-soft rounded-xl px-3 py-2 text-sm text-ink-600">
           <p>“{span.text}”</p>
           {span.source ? <p className="mt-1 text-xs text-ink-400">来自：{span.source}</p> : null}
         </blockquote>
@@ -235,10 +250,10 @@ function DictationForm({
               type="button"
               onClick={() => setChoice(option)}
               aria-pressed={choice === option}
-              className={`rounded-xl border px-3 py-2.5 text-left text-sm transition-colors ${
+              className={`glass-soft rounded-xl border px-3 py-2.5 text-left text-sm transition-colors ${
                 choice === option
                   ? 'border-accent-500 bg-accent-50'
-                  : 'border-ink-200 bg-white hover:bg-ink-50'
+                  : 'border-ink-200'
               }`}
             >
               {option}
@@ -267,7 +282,7 @@ function DictationForm({
           type="button"
           onClick={() => speak(word)}
           aria-label={`重播 ${word} 的发音`}
-          className="rounded-full border border-ink-200 px-2.5 py-1.5 text-sm hover:bg-ink-50"
+          className="chip px-2.5 py-1.5 text-sm"
         >
           🔊 重播
         </button>
@@ -283,7 +298,7 @@ function DictationForm({
         onChange={(event) => setText(event.target.value)}
         autoComplete="off"
         autoCapitalize="off"
-        className="w-full rounded-xl border border-ink-200 bg-white px-3 py-2.5 text-sm outline-none"
+        className="glass-input w-full rounded-xl border border-ink-200 px-3 py-2.5 text-sm outline-none"
         placeholder="不记得就直接提交，没关系"
       />
       <button
@@ -336,10 +351,10 @@ function AnswerForm({
                 type="button"
                 onClick={() => setChoice(option)}
                 aria-pressed={choice === option}
-                className={`rounded-xl border px-3 py-2.5 text-left text-sm transition-colors ${
+                className={`glass-soft rounded-xl border px-3 py-2.5 text-left text-sm transition-colors ${
                   choice === option
                     ? 'border-accent-500 bg-accent-50'
-                    : 'border-ink-200 bg-white hover:bg-ink-50'
+                    : 'border-ink-200'
                 }`}
               >
                 {option}
@@ -366,7 +381,7 @@ function AnswerForm({
             value={text}
             onChange={(event) => setText(event.target.value)}
             autoComplete="off"
-            className="w-full rounded-xl border border-ink-200 bg-white px-3 py-2.5 text-sm outline-none"
+            className="glass-input w-full rounded-xl border border-ink-200 px-3 py-2.5 text-sm outline-none"
             placeholder="不记得就直接提交，没关系"
           />
           <button

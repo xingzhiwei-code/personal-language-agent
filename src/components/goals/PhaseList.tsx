@@ -36,12 +36,12 @@ export function PhaseList({
           return (
             <li
               key={phase.id}
-              className={`rounded-xl border p-3 ${
+              className={`glass-soft rounded-2xl p-3 ${
                 phase.status === 'active'
-                  ? 'border-accent-200 bg-accent-50/50'
-                  : phase.status === 'done'
-                    ? 'border-ink-100 bg-white'
-                    : 'border-ink-100 bg-ink-50/50 opacity-70'
+                  ? 'bg-accent-50/50'
+                  : phase.status === 'locked'
+                    ? 'opacity-70'
+                    : ''
               }`}
             >
               <div className="flex flex-wrap items-center gap-2">

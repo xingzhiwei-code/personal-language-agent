@@ -32,7 +32,7 @@ export default async function ChatEntryPage({
       </header>
 
       {!aiAvailable ? (
-        <Card className="border-amber-200 bg-amber-50/60">
+        <Card className="bg-amber-50/60">
           <p className="text-sm font-medium">还没有配置 AI Provider</p>
           <p className="mt-1 text-sm text-ink-600">
             对话需要一个 LLM。你仍然可以进入会话——命令（例如「不要纠正我」「我只有 3

@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>C · 真液态玻璃（增强版）— UI 原型</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --ink:#1c1c1e; --ink2:#6b6b70; --ink3:#aeaeb2;
+    --blue:#0a84ff; --green:#30d158; --orange:#ff9f0a; --red:#ff453a; --purple:#bf5af2;
+  }
+  body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    color:var(--ink);min-height:100vh;-webkit-font-smoothing:antialiased;overflow-x:hidden;-webkit-tap-highlight-color:transparent}
+  button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;
+    transition:transform .12s ease,filter .12s ease}
+  button:active,button.pressed{filter:brightness(.85)}
+  /* ===== liquid wallpaper: morphing blobs + light streaks ===== */
+  .wash{position:fixed;inset:0;z-index:0;overflow:hidden;
+    background:linear-gradient(180deg,#dfe9fd 0%,#f2e9f8 45%,#e9f5ee 100%)}
+  .blob{position:absolute;filter:blur(55px);opacity:.7;will-change:transform;transform:translateZ(0);
+    animation:drift 24s ease-in-out infinite alternate}
+  .blob.a{width:440px;height:440px;left:-130px;top:-110px;background:radial-gradient(circle at 35% 35%,#9cc2ff,#7aa8ff);
+    border-radius:42% 58% 63% 37%/45% 42% 58% 55%}
+  .blob.b{width:400px;height:400px;right:-110px;top:24%;background:radial-gradient(circle at 60% 40%,#ffc4e0,#f49fd0);
+    border-radius:60% 40% 38% 62%/52% 60% 40% 48%;animation-delay:-9s}
+  .blob.c{width:380px;height:380px;left:6%;bottom:-130px;background:radial-gradient(circle at 40% 60%,#b5e8c9,#8fd8ae);
+    border-radius:38% 62% 55% 45%/58% 38% 62% 42%;animation-delay:-4s}
+  .blob.d{width:280px;height:280px;right:6%;bottom:4%;background:radial-gradient(circle at 50% 50%,#d3bfff,#b795ff);
+    border-radius:55% 45% 60% 40%/45% 55% 45% 55%;animation-delay:-14s;opacity:.6}
+  @keyframes drift{from{translate:0 0}to{translate:46px 34px}}
+  .streak{position:absolute;top:-20%;height:140%;width:120px;filter:blur(28px);opacity:.35;will-change:transform;
+    background:linear-gradient(180deg,transparent,rgba(255,255,255,.9),transparent);
+    transform:skewX(-14deg);animation:sweep 16s ease-in-out infinite alternate}
+  .streak.s1{left:18%}.streak.s2{left:64%;animation-delay:-8s;width:80px;opacity:.25}
+  @keyframes sweep{from{translate:-40px 0}to{translate:60px 0}}
+  .wrap{position:relative;z-index:2;max-width:480px;margin:0 auto;padding:20px 16px 130px}
+  .badge{position:fixed;top:12px;right:12px;z-index:20;font-size:10px;letter-spacing:.12em;color:#5b4a00;
+    background:rgba(255,255,255,.65);border:1px solid rgba(255,255,255,.95);padding:5px 10px;border-radius:999px;
+    backdrop-filter:blur(14px);box-shadow:0 4px 14px rgba(90,120,200,.15)}
+  /* ===== liquid glass card: heavy frost + refractive edge + sheen ===== */
+  .glass{position:relative;background:rgba(255,255,255,.42);
+    border-radius:24px;overflow:hidden;
+    backdrop-filter:blur(30px) saturate(200%);-webkit-backdrop-filter:blur(30px) saturate(200%);
+    box-shadow:0 16px 44px rgba(80,100,160,.16), inset 0 1px 0 rgba(255,255,255,.95), inset 0 -1px 0 rgba(255,255,255,.35);
+    padding:18px}
+  /* refractive iridescent edge */
+  .glass::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1.5px;pointer-events:none;
+    background:linear-gradient(135deg,rgba(255,255,255,.95) 0%,rgba(170,200,255,.35) 25%,rgba(255,190,225,.3) 50%,rgba(190,230,255,.35) 75%,rgba(255,255,255,.95) 100%);
+    -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);
+    -webkit-mask-composite:xor;mask-composite:exclude}
+  /* travelling specular sheen */
+  .glass::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+    background:linear-gradient(105deg,transparent 46%,rgba(255,255,255,.16) 50%,transparent 54%)}
+  @keyframes sheen{0%,100%{background-position:120% 0}50%{background-position:-20% 0}}
+  .sec{margin-bottom:14px}
+  /* top */
+  .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+  .brand{display:flex;align-items:center;gap:10px}
+  .ava{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;position:relative;overflow:hidden;
+    background:radial-gradient(circle at 32% 28%,rgba(255,255,255,.9),rgba(255,255,255,.15) 55%),linear-gradient(135deg,#7db4ff,#c4a8ff);
+    border:1px solid rgba(255,255,255,.9);
+    box-shadow:0 6px 18px rgba(120,140,255,.4), inset 0 2px 4px rgba(255,255,255,.8)}
+  .ava::after{content:"";position:absolute;top:5px;left:9px;width:12px;height:8px;border-radius:50%;
+    background:rgba(255,255,255,.85);filter:blur(1px);transform:rotate(-24deg)}
+  .brand b{font-size:16px;font-weight:700;letter-spacing:.04em}
+  .brand small{display:block;font-size:10.5px;color:var(--ink2);letter-spacing:.18em;font-weight:600}
+  .pill{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;
+    background:rgba(255,255,255,.66);border-radius:999px;padding:8px 14px;position:relative;overflow:hidden;
+    box-shadow:0 6px 18px rgba(80,100,160,.14), inset 0 1px 0 rgba(255,255,255,.9)}
+  .pill b{color:var(--orange);font-size:15px}
+  /* tabs */
+  .tabs{position:fixed;left:50%;transform:translateX(-50%);bottom:16px;z-index:10;display:flex;gap:2px;
+    background:rgba(255,255,255,.5);border-radius:999px;padding:5px;overflow:hidden;
+    backdrop-filter:blur(30px) saturate(200%);-webkit-backdrop-filter:blur(30px) saturate(200%);
+    box-shadow:0 14px 36px rgba(80,100,160,.22), inset 0 1px 0 rgba(255,255,255,.95)}
+  .tabs button{font-family:inherit;border:0;background:transparent;color:var(--ink2);font-size:13.5px;font-weight:600;
+    padding:10px 26px;border-radius:999px;cursor:pointer;position:relative;z-index:1;transition:transform .12s}
+  .tabs button:active,.tabs button.pressed{transform:scale(.93)}
+  .tabs button.on{background:rgba(28,28,30,.88);color:#fff;box-shadow:0 4px 12px rgba(0,0,0,.2)}
+  .screen{display:none}.screen.on{display:block;animation:fin .35s ease}
+  @keyframes fin{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  .kick{font-size:11px;font-weight:700;letter-spacing:.2em;color:var(--ink2);margin-bottom:10px}
+  h2{font-size:20px;font-weight:700;letter-spacing:-.01em}
+  .sub{font-size:13px;color:var(--ink2);margin-top:6px;line-height:1.65}
+  .coach{display:flex;gap:10px;align-items:flex-start;padding:14px 16px;font-size:13px;line-height:1.65;color:#3a3a3c}
+  .coach .d{width:8px;height:8px;border-radius:50%;background:var(--green);margin-top:6px;flex:none;
+    box-shadow:0 0 10px rgba(48,209,88,.8)}
+  /* plan rows: mini glass */
+  .row{display:flex;align-items:center;gap:12px;background:rgba(255,255,255,.6);
+    border-radius:18px;padding:12px;margin-top:10px;position:relative;overflow:hidden;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.85), 0 4px 14px rgba(80,100,160,.08)}
+  .n{width:28px;height:28px;flex:none;border-radius:50%;display:grid;place-items:center;font-size:12.5px;font-weight:700;
+    color:#fff;background:linear-gradient(135deg,#6db4ff,#0a84ff);
+    box-shadow:0 4px 10px rgba(10,132,255,.35), inset 0 1px 2px rgba(255,255,255,.6)}
+  .row b{font-size:14px;display:block}
+  .row small{font-size:11.5px;color:var(--ink2)}
+  .eta{margin-left:auto;flex:none;font-size:12px;font-weight:700;color:var(--blue);
+    background:rgba(10,132,255,.12);border-radius:999px;padding:6px 12px;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.7)}
+  .btnrow{display:flex;gap:10px;margin-top:14px}
+  .btn{font-family:inherit;font-weight:700;font-size:14.5px;border-radius:18px;padding:15px 0;cursor:pointer;flex:1;border:0;
+    transition:transform .15s;position:relative;overflow:hidden}
+  .btn:active,.btn.pressed{transform:scale(.97)}
+  .btn-p{background:linear-gradient(180deg,#3aa0ff,#0a84ff);color:#fff;
+    box-shadow:0 10px 26px rgba(10,132,255,.4), inset 0 1.5px 0 rgba(255,255,255,.55), inset 0 -2px 4px rgba(0,60,140,.25)}
+  .btn-p::after{content:"";position:absolute;left:8%;right:8%;top:3px;height:42%;border-radius:12px;
+    background:linear-gradient(180deg,rgba(255,255,255,.5),transparent);pointer-events:none}
+  .btn-g{background:rgba(255,255,255,.66);color:var(--ink2);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 4px 12px rgba(80,100,160,.1)}
+  /* semantic */
+  .core{text-align:center;padding:8px 0 14px}
+  .core .w{font-size:30px;font-weight:700;letter-spacing:.01em}
+  .core .ph{font-size:12px;color:var(--ink2);margin-top:6px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+  .chip{font-size:12.5px;padding:8px 14px;border-radius:999px;font-weight:500;position:relative;
+    background:rgba(255,255,255,.62);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 3px 10px rgba(80,100,160,.08)}
+  .chip i{font-style:normal;font-size:10.5px;font-weight:700;margin-right:6px}
+  .chip.s i{color:var(--blue)} .chip.a i{color:var(--red)} .chip.f i{color:var(--purple)}
+  .note{text-align:center;font-size:11.5px;color:var(--ink2);margin-top:14px}
+  /* tiles */
+  .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .tile{border-radius:20px;padding:18px 8px;text-align:center;cursor:pointer;transition:transform .12s ease,filter .12s ease}
+  .tile:active,.tile.pressed{transform:scale(.95);filter:brightness(.94)}
+  .tile .e{font-size:24px;margin-bottom:8px}
+  .tile b{font-size:13px;display:block}
+  .tile small{font-size:11px;color:var(--ink2)}
+  /* stats */
+  .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:6px}
+  .cell{text-align:center;background:rgba(255,255,255,.6);border-radius:18px;padding:13px 4px;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.85), 0 4px 12px rgba(80,100,160,.08)}
+  .cell b{font-size:21px;font-weight:700;font-variant-numeric:tabular-nums}
+  .cell small{display:block;font-size:10px;color:var(--ink2);margin-top:4px}
+  .mrow{margin-top:14px}
+  .mrow .lab{display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:7px}
+  .mrow .lab span:last-child{color:var(--ink2);font-size:11.5px}
+  .bar{height:10px;border-radius:99px;background:rgba(255,255,255,.5);overflow:hidden;position:relative;
+    box-shadow:inset 0 1px 3px rgba(80,100,160,.18)}
+  .bar i{display:block;height:100%;border-radius:99px;position:relative;
+    background:linear-gradient(180deg,#6db4ff,#0a84ff);box-shadow:0 2px 8px rgba(10,132,255,.4)}
+  .bar i::after{content:"";position:absolute;left:4px;right:4px;top:1.5px;height:3px;border-radius:99px;
+    background:linear-gradient(180deg,rgba(255,255,255,.7),transparent)}
+  .bar.p i{background:linear-gradient(180deg,#d9a9ff,#bf5af2)}
+  /* learn */
+  .prog{display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--ink2);font-weight:600;margin-bottom:14px}
+  .prog .bar{flex:1}
+  .wcard{perspective:1100px;cursor:pointer;margin-bottom:10px;transition:transform .12s ease,filter .12s ease}
+  .wcard:active,.wcard.pressed{transform:scale(.985);filter:brightness(.96)}
+  .wcard .in{position:relative;min-height:320px;transform-style:preserve-3d;transition:transform .65s cubic-bezier(.3,.7,.3,1.08)}
+  .wcard.flip .in{transform:rotateY(180deg)}
+  .fc{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
+    background:rgba(255,255,255,.42);border-radius:28px;padding:28px;text-align:center;overflow:hidden;
+    backdrop-filter:blur(32px) saturate(210%);-webkit-backdrop-filter:blur(32px) saturate(210%);
+    box-shadow:0 24px 60px rgba(80,100,160,.24), inset 0 2px 0 rgba(255,255,255,.95), inset 0 -2px 0 rgba(255,255,255,.3)}
+  .fc::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1.5px;pointer-events:none;
+    background:linear-gradient(135deg,rgba(255,255,255,.95),rgba(170,200,255,.4) 30%,rgba(255,190,225,.35) 55%,rgba(255,255,255,.95));
+    -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);
+    -webkit-mask-composite:xor;mask-composite:exclude}
+  .fc::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+    background:linear-gradient(105deg,transparent 44%,rgba(255,255,255,.4) 50%,transparent 56%);
+    background-size:280% 100%;animation:sheen 6s ease-in-out infinite}
+  .fc.bk{transform:rotateY(180deg)}
+  .w{font-size:46px;font-weight:700;letter-spacing:-.01em;position:relative;z-index:1;
+    text-shadow:0 2px 20px rgba(120,150,255,.25)}
+  .ph{font-size:14px;color:var(--ink2);position:relative;z-index:1}
+  .tagp{font-size:11px;font-weight:700;letter-spacing:.14em;color:var(--blue);position:relative;z-index:1;
+    background:rgba(10,132,255,.12);border-radius:999px;padding:6px 15px;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.8)}
+  /* nested inner glass: depth layering */
+  .inner-glass{width:100%;border-radius:18px;padding:14px;position:relative;z-index:1;
+    background:rgba(255,255,255,.5);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.9), inset 0 -1px 2px rgba(80,100,160,.1)}
+  .df{font-size:18px;font-weight:700}
+  .ex{font-size:13.5px;color:var(--ink2);font-style:italic;line-height:1.7;margin-top:8px}
+  .hint{text-align:center;font-size:11px;color:var(--ink3);letter-spacing:.14em;margin-bottom:14px}
+  .grade{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+  .grade button{font-family:inherit;font-size:14px;font-weight:700;padding:17px 0;border-radius:20px;cursor:pointer;border:0;
+    background:rgba(255,255,255,.68);transition:transform .12s;position:relative;overflow:hidden;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.95), 0 6px 16px rgba(80,100,160,.12)}
+  .grade button:active,.grade button.pressed{transform:scale(.94)}
+  .grade .g1{color:var(--green)} .grade .g2{color:var(--orange)} .grade .g3{color:var(--red)}
+  /* goals */
+  .phases{display:flex;align-items:flex-start;margin:16px 0 6px}
+  .pn{width:62px;text-align:center;flex:none}
+  .pn .d{width:38px;height:38px;margin:0 auto 7px;border-radius:50%;display:grid;place-items:center;font-size:12.5px;font-weight:700;
+    background:rgba(255,255,255,.68);color:var(--ink3);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 3px 10px rgba(80,100,160,.1)}
+  .pn.done .d{background:linear-gradient(180deg,#4cd964,#30d158);color:#fff;
+    box-shadow:0 4px 12px rgba(48,209,88,.4), inset 0 1px 2px rgba(255,255,255,.6)}
+  .pn.now .d{border:2px solid var(--blue);color:var(--blue);background:rgba(255,255,255,.7)}
+  .pn small{font-size:10.5px;color:var(--ink2)}
+  .pl{flex:1;height:3px;background:rgba(255,255,255,.6);border-radius:2px;margin:17px 2px 0;box-shadow:inset 0 1px 2px rgba(80,100,160,.15)}
+  .pl.done{background:linear-gradient(90deg,#4cd964,#30d158)}
+  .swrow{display:flex;justify-content:space-between;align-items:center;gap:12px}
+  .sw{position:relative;width:51px;height:31px;flex:none}
+  .sw input{opacity:0;width:0;height:0}
+  .sw .tr{position:absolute;inset:0;border-radius:99px;background:rgba(255,255,255,.68);cursor:pointer;transition:.2s;
+    box-shadow:inset 0 2px 4px rgba(80,100,160,.2)}
+  .sw .tr::before{content:"";position:absolute;width:27px;height:27px;left:2px;top:2px;border-radius:50%;background:#fff;
+    box-shadow:0 2px 8px rgba(0,0,0,.22), inset 0 1px 1px rgba(255,255,255,1);transition:.2s}
+  .sw input:checked + .tr{background:linear-gradient(180deg,#4cd964,#30d158)}
+  .sw input:checked + .tr::before{transform:translateX(20px)}
+  .sg{margin-top:14px;border-radius:20px;padding:16px;position:relative;overflow:hidden;
+    background:rgba(255,255,255,.55);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 6px 18px rgba(80,100,160,.1)}
+  .sg p{font-size:14.5px;line-height:1.65}
+  .sg p b{color:var(--blue);font-size:17px}
+  .sg .ev{font-size:11.5px;color:var(--ink2);margin-top:8px}
+  .sg .ops{display:flex;gap:8px;margin-top:14px}
+  .sg .ops button{flex:1;font-family:inherit;font-size:13.5px;font-weight:700;padding:12px 0;border-radius:14px;cursor:pointer;border:0;white-space:nowrap;transition:transform .12s}
+  .sg .ops button:active,.sg .ops button.pressed{transform:scale(.95)}
+  .tl{margin-top:16px;padding-left:18px;position:relative}
+  .tl::before{content:"";position:absolute;left:5px;top:6px;bottom:6px;width:2px;border-radius:2px;background:rgba(120,130,160,.25)}
+  .tl div{position:relative;font-size:12.5px;color:var(--ink2);margin-bottom:12px}
+  .tl div::before{content:"";position:absolute;left:-17.5px;top:5px;width:9px;height:9px;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,#fff,#0a84ff);box-shadow:0 2px 6px rgba(10,132,255,.4)}
+  .tl b{color:var(--ink)}
+  .chips.l{justify-content:flex-start}
+  .end{text-align:center;font-size:11px;color:var(--ink2);margin-top:28px;letter-spacing:.1em}
+</style>
+</head>
+<body>
+<div class="wash"><i class="blob a"></i><i class="blob b"></i><i class="blob c"></i><i class="blob d"></i><i class="streak s1"></i><i class="streak s2"></i></div>
+<div class="badge">C · 真液态玻璃 · 增强版</div>
+<div class="wrap">
+  <div class="top">
+    <div class="brand"><div class="ava"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="4" y="7" width="16" height="11" rx="5.5" stroke="#fff" stroke-width="1.8"/><circle cx="9.2" cy="12" r="1.7" fill="#fff"/><circle cx="14.8" cy="12" r="1.7" fill="#fff"/><path d="M12 7V3.5" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/><path d="M9.5 15.2h5" stroke="#fff" stroke-width="1.4" stroke-linecap="round"/></svg></div>
+      <div><b>YIYI</b><small>ENGLISH COACH</small></div></div>
+    <div class="pill">🔥 <b>6</b> 连续学习</div>
+  </div>
+
+  <!-- 今日 -->
+  <div class="screen on" id="s-home">
+    <div class="glass sec coach"><span class="d"></span><span>第 6 个学习日 · 今日主题「决策」。教练只记录事实：昨天 12 个词全部按时复习，无欠账。</span></div>
+    <div class="glass sec">
+      <div class="kick">今日计划</div>
+      <h2>新学 8 · 复习 12 · 预计 25 分钟</h2>
+      <p class="sub">按雅思 7 分第二阶段安排，「决策」主题词优先。本地规则生成，无 AI 参与。</p>
+      <div class="row"><span class="n">1</span><div><b>主题词汇 · 决策</b><small>8 个任务 · 同义/反义成网，不再孤立</small></div><span class="eta">12 分钟</span></div>
+      <div class="row"><span class="n">2</span><div><b>间隔复习</b><small>12 条到期，先过一遍</small></div><span class="eta">8 分钟</span></div>
+      <div class="row"><span class="n">3</span><div><b>听力跟读</b><small>决策主题短句 ×5</small></div><span class="eta">5 分钟</span></div>
+      <div class="btnrow"><button class="btn btn-p">开始今日计划</button><button class="btn btn-g" style="flex:.6">换一个</button></div>
+    </div>
+    <div class="glass sec">
+      <div class="kick">语义网络</div>
+      <div class="core"><div class="w">ambiguous</div><div class="ph">/æmˈbɪɡjuəs/ · adj · CET6</div></div>
+      <div class="chips">
+        <span class="chip s"><i>同义</i>vague · unclear</span>
+        <span class="chip a"><i>反义</i>clear · explicit</span>
+        <span class="chip f"><i>词族</i>ambiguity n.</span>
+      </div>
+      <p class="note">7405 个锚点词已织入关系网 —— 卡片不再是一座孤岛</p>
+    </div>
+    <div class="kick" style="margin:18px 2px 10px">换个方式开始</div>
+    <div class="tiles">
+      <div class="glass tile"><div class="e">💬</div><b>自由聊天</b><br><small>想聊什么都行</small></div>
+      <div class="glass tile"><div class="e">⚡</div><b>快速复习</b><br><small>12 条到期</small></div>
+      <div class="glass tile"><div class="e">🔍</div><b>问个问题</b><br><small>先答再练</small></div>
+    </div>
+    <div class="glass sec" style="margin-top:14px">
+      <div class="kick">最近的情况</div>
+      <div class="grid4">
+        <div class="cell"><b>6</b><small>7天学习次数</small></div>
+        <div class="cell"><b>148</b><small>7天作答</small></div>
+        <div class="cell"><b>12</b><small>待复习</small></div>
+        <div class="cell"><b>326</b><small>知识条目</small></div>
+      </div>
+      <div class="mrow"><div class="lab"><span><b>词汇</b></span><span>掌握度 62% · 趋势上升 · 置信度 71%</span></div><div class="bar"><i style="width:62%"></i></div></div>
+      <div class="mrow"><div class="lab"><span><b>听力</b></span><span>掌握度 41% · 数据还很少，先别当结论</span></div><div class="bar p"><i style="width:41%"></i></div></div>
+    </div>
+  </div>
+
+  <!-- 学习 -->
+  <div class="screen" id="s-learn">
+    <div class="prog"><span><b>3</b> / 12</span><div class="bar"><i style="width:25%"></i></div><span>25%</span></div>
+    <div class="wcard" onclick="this.classList.toggle('flip')"><div class="in">
+      <div class="fc"><span class="tagp">adj · CET6</span><div class="w">ambiguous</div><div class="ph">/æmˈbɪɡjuəs/</div></div>
+      <div class="fc bk">
+        <div class="inner-glass"><div class="df">含糊不清的；模棱两可的</div>
+          <div class="chips" style="margin-top:10px"><span class="chip s"><i>同义</i>vague · unclear</span><span class="chip a"><i>反义</i>clear · explicit</span><span class="chip f"><i>词族</i>ambiguity</span></div></div>
+        <div class="ex" style="position:relative;z-index:1">"His answer was deliberately ambiguous."</div>
+      </div>
+    </div></div>
+    <p class="hint">— 轻点卡片翻面 —</p>
+    <div class="grade"><button class="g1">认识</button><button class="g2">模糊</button><button class="g3">不认识</button></div>
+    <div class="glass coach"><span class="d"></span><span>教练记录：这个词 3 天前出现过；同词族 ambiguity 你已掌握。只记录，不评判。</span></div>
+  </div>
+
+  <!-- 目标 -->
+  <div class="screen" id="s-goals">
+    <div class="glass sec">
+      <div class="kick">当前主要目标</div>
+      <h2>雅思 7 分</h2>
+      <p class="sub">工作场景 · 学术阅读 · 目标 2027-06</p>
+      <div class="phases">
+        <div class="pn done"><div class="d">✓</div><small>筑基</small></div><div class="pl done"></div>
+        <div class="pn now"><div class="d">2</div><small>强化</small></div><div class="pl"></div>
+        <div class="pn"><div class="d">3</div><small>冲刺</small></div><div class="pl"></div>
+        <div class="pn"><div class="d">4</div><small>模考</small></div>
+      </div>
+    </div>
+    <div class="glass sec">
+      <div class="kick">自适应起点</div>
+      <div class="swrow"><p class="sub" style="margin:0">按学习数据建议调整，确认后才生效</p>
+        <label class="sw"><input type="checkbox" checked><span class="tr"></span></label></div>
+      <div class="sg">
+        <p>你的水平可能在 <b>5.5</b> 左右（之前是 5.0），要更新吗？</p>
+        <p class="ev">依据：近 14 天学习数据 · 置信度：中</p>
+        <div class="ops"><button class="btn btn-p">更新</button><button class="btn btn-g">保持不变</button><button class="btn btn-g">去重测</button></div>
+      </div>
+      <div class="tl"><div><b>2026-10-10</b> · 5.0 → 5.5 已确认 · 依据：近14天学习数据</div><div><b>2026-09-28</b> · 首次校准 5.0 · 摸底测试</div></div>
+    </div>
+    <div class="glass sec">
+      <div class="kick">场景</div>
+      <div class="chips l"><span class="chip">💼 工作会议</span><span class="chip">📄 学术阅读</span><span class="chip">✈️ 出国旅行</span></div>
+    </div>
+  </div>
+
+  <p class="end">YIYI · 真液态玻璃 · 通透有厚度的未来</p>
+</div>
+<nav class="tabs"><button class="on" onclick="go('s-home',this)">今日</button><button onclick="go('s-learn',this)">学习</button><button onclick="go('s-goals',this)">目标</button></nav>
+<script>
+function go(id,b){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));document.getElementById(id).classList.add('on');document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('on'));b.classList.add('on');scrollTo({top:0,behavior:'smooth'})}
+/* press feedback via JS: reliable even when :active doesn't fire (some webviews) */
+(function(){
+  var lastTouch=0;
+  document.querySelectorAll('button,.tile,.wcard').forEach(function(el){
+    el.addEventListener('touchstart',function(){lastTouch=Date.now();el.classList.add('pressed')},{passive:true});
+    el.addEventListener('touchend',function(){el.classList.remove('pressed')});
+    el.addEventListener('touchcancel',function(){el.classList.remove('pressed')});
+    el.addEventListener('mousedown',function(){if(Date.now()-lastTouch<500)return;el.classList.add('pressed')});
+    el.addEventListener('mouseup',function(){el.classList.remove('pressed')});
+    el.addEventListener('mouseleave',function(){el.classList.remove('pressed')});
+  });
+})();
+</script>
+</body>
+</html>

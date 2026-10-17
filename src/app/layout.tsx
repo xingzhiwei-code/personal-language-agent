@@ -14,7 +14,7 @@ export const viewport: Viewport = {
 };
 
 const NAV = [
-  { href: '/', label: '首页' },
+  { href: '/', label: '今日' },
   { href: '/knowledge', label: '知识库' },
   { href: '/history', label: '历史' },
   { href: '/goals', label: '目标' },
@@ -25,11 +25,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="zh-CN">
       <body className="min-h-full">
-        <div className="mx-auto flex min-h-screen w-full max-w-3xl flex-col px-4 pb-24 sm:px-6 sm:pb-10">
+        <div className="wallpaper" aria-hidden="true">
+          <span className="blob blob-a" />
+          <span className="blob blob-b" />
+          <span className="blob blob-c" />
+          <span className="blob blob-d" />
+        </div>
+
+        <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-3xl flex-col px-4 pb-28 sm:px-6 sm:pb-10">
           <header className="flex flex-wrap items-center justify-between gap-3 py-5">
             <Link href="/" className="text-sm font-semibold tracking-tight text-ink-900">
               语言学习助手
-              <span className="ml-2 rounded-full bg-ink-100 px-2 py-0.5 text-[10px] font-normal text-ink-400">
+              <span className="chip ml-2 px-2 py-0.5 text-[10px] font-normal text-ink-400">
                 {APP_VERSION_LABEL}
               </span>
             </Link>
@@ -38,7 +45,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="rounded-lg px-3 py-1.5 text-sm text-ink-600 hover:bg-ink-100 hover:text-ink-900"
+                  className="rounded-lg px-3 py-1.5 text-sm text-ink-600 hover:bg-white/50 hover:text-ink-900"
                 >
                   {item.label}
                 </Link>
@@ -49,17 +56,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <main className="flex-1">{children}</main>
         </div>
 
-        {/* Mobile bottom navigation */}
-        <nav
-          aria-label="主导航"
-          className="fixed inset-x-0 bottom-0 z-10 flex border-t border-ink-200 bg-white/95 backdrop-blur sm:hidden"
-        >
+        {/* Mobile bottom navigation — floating frosted glass pill */}
+        <nav aria-label="主导航" className="glass-nav sm:hidden">
           {NAV.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="flex-1 px-1 py-3 text-center text-xs text-ink-600"
-            >
+            <Link key={item.href} href={item.href}>
               {item.label}
             </Link>
           ))}

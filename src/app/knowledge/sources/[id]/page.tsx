@@ -22,7 +22,7 @@ export default async function ContentSourceDetailPage({ params }: { params: Prom
       </header>
       <Card>
         <SectionTitle title="原文" hint="保存在本机；可从中手动摘录表达" />
-        <pre className="max-h-[32rem] overflow-auto whitespace-pre-wrap break-words rounded-xl bg-ink-50 p-4 text-sm leading-6 text-ink-600">{content.text}</pre>
+        <pre className="glass-soft max-h-[32rem] overflow-auto whitespace-pre-wrap break-words rounded-xl p-4 text-sm leading-6 text-ink-600">{content.text}</pre>
       </Card>
       <Card>
         <SectionTitle title="手动添加表达" hint="保存后会关联到这篇原文" />

@@ -16,7 +16,7 @@ export default function GlobalError({
   }, [error]);
 
   return (
-    <div className="mt-10 rounded-2xl border border-ink-200 bg-white p-6 text-center">
+    <div className="glass-soft mt-10 rounded-3xl p-6 text-center">
       <p className="text-sm font-medium">这个页面没能加载出来</p>
       <p className="mx-auto mt-1 max-w-md text-sm text-ink-400">
         你的学习数据没有受影响。可以重试，或者回首页继续。
@@ -25,13 +25,13 @@ export default function GlobalError({
         <button
           type="button"
           onClick={reset}
-          className="rounded-xl bg-accent-500 px-4 py-2.5 text-sm font-medium text-white"
+          className="jelly jelly-primary px-4 py-2.5 text-sm"
         >
           重试
         </button>
         <Link
           href="/"
-          className="rounded-xl border border-ink-200 px-4 py-2.5 text-sm font-medium"
+          className="jelly jelly-secondary px-4 py-2.5 text-sm"
         >
           回首页
         </Link>

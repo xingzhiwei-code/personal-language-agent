@@ -23,7 +23,7 @@ export function KnowledgeFlowControls({ id, status }: { id: string; status: Know
   if (status !== 'new' && status !== 'active') return null;
 
   return (
-    <form action={submit} className="mb-4 flex flex-wrap items-center gap-2 rounded-xl bg-ink-50 p-3">
+    <form action={submit} className="glass-soft mb-4 flex flex-wrap items-center gap-2 rounded-xl p-3">
       <input type="hidden" name="itemId" value={id} />
       <button type="submit" className={status === 'new' ? buttonStyles.primary : buttonStyles.secondary} disabled={pending}>
         {pending ? '处理中…' : status === 'new' ? '加入学习' : '暂停并放回词库池'}

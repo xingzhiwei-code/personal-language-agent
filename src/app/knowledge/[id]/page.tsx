@@ -99,7 +99,7 @@ export default async function KnowledgeDetailPage({
                 return (
                   <span
                     key={modality}
-                    className="rounded-full bg-ink-100 px-2 py-0.5 text-ink-600"
+                    className="chip px-2 py-0.5 text-ink-600"
                   >
                     {MODALITY_LABELS[modality]}：
                     {stat ? `${Math.round(stat.strength * 100)}%（${stat.attempts} 次）` : '未测'}
@@ -129,7 +129,7 @@ export default async function KnowledgeDetailPage({
           <SectionTitle title="例句" hint="标注了来源，AI 生成的例句会明确标记" />
           <ul className="space-y-2 text-sm">
             {item.examples.map((example) => (
-              <li key={example.text} className="rounded-xl bg-ink-50 px-3 py-2">
+              <li key={example.text} className="glass-soft rounded-xl px-3 py-2">
                 <p>{example.text}</p>
                 <p className="mt-1 text-[11px] text-ink-400">
                   {ORIGIN_LABELS[example.origin]}
@@ -148,7 +148,7 @@ export default async function KnowledgeDetailPage({
             {relations.map(({ relation, other, direction }) => (
               <li
                 key={relation.id}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-ink-200 px-3 py-2"
+                className="glass-soft flex flex-wrap items-center justify-between gap-2 rounded-xl px-3 py-2"
               >
                 <span className="text-sm">
                   <Badge>{RELATION_LABELS[relation.type]}</Badge>

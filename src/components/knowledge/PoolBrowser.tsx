@@ -46,7 +46,7 @@ export function PoolBrowser({
 
   return (
     <form action={promoteAction} className="space-y-3">
-      <div className="sticky top-2 z-10 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-ink-200 bg-white/95 p-3 shadow-sm backdrop-blur">
+      <div className="glass-soft sticky top-2 z-10 flex flex-wrap items-center justify-between gap-2 rounded-2xl p-3">
         <label className="flex items-center gap-2 text-sm text-ink-600">
           <input
             type="checkbox"
@@ -105,7 +105,7 @@ export function PoolBrowser({
       ) : null}
       <ul className="space-y-2">
         {entries.map(({ item }) => (
-          <li key={item.id} className="flex items-start gap-3 rounded-2xl border border-ink-200 bg-white p-4">
+          <li key={item.id} className="glass-soft flex items-start gap-3 rounded-2xl p-4">
             <input
               type="checkbox"
               aria-label={`选择 ${item.text}`}

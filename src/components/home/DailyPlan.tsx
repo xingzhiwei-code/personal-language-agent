@@ -28,7 +28,7 @@ export function DailyPlan({
 
   if (restingToday) {
     return (
-      <Card className="border-accent-100 bg-accent-50/60">
+      <Card className="bg-accent-50/60">
         <h2 className="text-lg font-semibold">今天已设为休息日</h2>
         <p className="mt-1 text-sm text-ink-600">今天不会再生成计划或提醒。跨日后会自动恢复。</p>
         <form action={resumeDailyPlanAction} className="mt-4">
@@ -46,7 +46,7 @@ export function DailyPlan({
   );
 
   return (
-    <Card className="border-accent-100 bg-gradient-to-b from-accent-50/70 to-white">
+    <Card className="bg-gradient-to-b from-accent-50/60 to-white/40">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-xs font-medium text-accent-600">今日计划</p>
@@ -60,7 +60,7 @@ export function DailyPlan({
 
       <ol className="mt-4 space-y-2">
         {recommendations.map((recommendation, index) => (
-          <li key={recommendation.id} className="rounded-xl border border-ink-100 bg-white p-3">
+          <li key={recommendation.id} className="glass-soft rounded-2xl p-3">
             <div className="flex flex-wrap items-center gap-2">
               <span className="flex h-6 w-6 items-center justify-center rounded-full bg-ink-100 text-xs font-medium">{index + 1}</span>
               <span className="font-medium">{ACTIVITY_LABELS[recommendation.activityType]}</span>

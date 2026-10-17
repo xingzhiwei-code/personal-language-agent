@@ -19,8 +19,8 @@ export default async function KnowledgeImportPage() {
           支持 CSV、JSON 和每行一词的 TXT。预览确认后，条目会安全地进入词库池。
         </p>
         <nav className="mt-3 flex gap-2 text-sm">
-          <span className="rounded-lg bg-accent-500 px-3 py-2 font-medium text-white">文件导入</span>
-          <Link href="/knowledge/import/paste" className="rounded-lg border border-ink-200 bg-white px-3 py-2 text-ink-600">文本提炼</Link>
+          <span className="jelly jelly-primary px-3 py-2 text-sm">文件导入</span>
+          <Link href="/knowledge/import/paste" className="jelly jelly-secondary px-3 py-2 text-sm">文本提炼</Link>
         </nav>
       </header>
       <ImportWizard

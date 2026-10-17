@@ -10,7 +10,7 @@ const TABS = [
 
 export function KnowledgeTabs({ active }: { active: (typeof TABS)[number]['id'] }) {
   return (
-    <nav aria-label="知识库导航" className="flex gap-1 overflow-x-auto rounded-xl bg-ink-100 p-1">
+    <nav aria-label="知识库导航" className="glass-soft flex gap-1 overflow-x-auto rounded-2xl p-1">
       {TABS.map((tab) => (
         <Link
           key={tab.id}

@@ -63,7 +63,7 @@ export default async function PlacementPage() {
             <input type="hidden" name="clientToken" value={`placement-${Date.now()}`} />
             <button
               type="submit"
-              className="rounded-xl bg-accent-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-accent-600"
+              className="jelly jelly-primary px-4 py-2.5 text-sm"
               data-testid="start-placement"
             >
               开始摸底测试

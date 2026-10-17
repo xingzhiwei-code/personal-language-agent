@@ -115,7 +115,7 @@ export function PasteImportWizard({ aiConfigured }: { aiConfigured: boolean }) {
 
           <div className="mt-4 space-y-3">
             {candidates.map((candidate, index) => (
-              <article key={index} className={`rounded-xl border p-4 ${candidate.selected ? 'border-ink-200' : 'border-ink-100 opacity-60'}`}>
+              <article key={index} className={`glass-soft rounded-2xl p-4 ${candidate.selected ? '' : 'opacity-60'}`}>
                 <div className="flex items-start gap-3">
                   <input
                     type="checkbox"
@@ -230,7 +230,7 @@ export function PasteImportWizard({ aiConfigured }: { aiConfigured: boolean }) {
       ) : null}
 
       {result ? (
-        <Card className="border-accent-100 bg-accent-50">
+        <Card className="bg-accent-50/70">
           <h2 className="font-semibold text-accent-600">确认入库完成</h2>
           <p className="mt-2 text-sm text-ink-600">新增 {result.addedCount} 条，重复 {result.duplicateCount} 条，失败 {result.failedCount} 条。</p>
           <Link href="/knowledge?status=pool" className={`${buttonStyles.primary} mt-4`}>查看词库池</Link>

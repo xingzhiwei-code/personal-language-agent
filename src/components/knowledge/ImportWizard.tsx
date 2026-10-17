@@ -50,7 +50,7 @@ export function ImportWizard({ goals }: { goals: GoalOption[] }) {
                 type="file"
                 required
                 accept=".csv,.json,.txt,text/csv,application/json,text/plain"
-                className="mt-1 block w-full rounded-xl border border-ink-200 bg-white px-3 py-2 text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-ink-100 file:px-3 file:py-1.5 file:text-sm"
+                className="glass-input mt-1 block w-full rounded-xl border border-ink-200 px-3 py-2 text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-ink-100 file:px-3 file:py-1.5 file:text-sm"
               />
               <p className="mt-1 text-xs text-ink-400">UTF-8 编码，最多 20,000 条、10 MB</p>
             </div>
@@ -213,7 +213,7 @@ export function ImportWizard({ goals }: { goals: GoalOption[] }) {
       ) : null}
 
       {result ? (
-        <Card className="border-accent-100 bg-accent-50">
+        <Card className="bg-accent-50/70">
           <h2 className="font-semibold text-accent-600">{result.duplicateFile ? '未重复导入' : '导入完成'}</h2>
           <p className="mt-2 text-sm text-ink-600">
             新增 {result.addedCount} 条，补全 {result.completedCount} 条，重复跳过 {result.duplicateCount} 条，失败 {result.failedCount} 条。

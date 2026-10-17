@@ -36,7 +36,7 @@ export function IntentInput() {
           value={text}
           onChange={(event) => setText(event.target.value)}
           placeholder="例如：我只有 3 分钟 / 今天只想聊天"
-          className="min-w-0 flex-1 rounded-xl border border-ink-200 bg-white px-3 py-2.5 text-sm outline-none placeholder:text-ink-400"
+          className="glass-input min-w-0 flex-1 rounded-xl border border-ink-200 px-3 py-2.5 text-sm outline-none placeholder:text-ink-400"
           maxLength={200}
         />
         <button type="submit" className={buttonStyles.secondary} disabled={pending}>
@@ -50,7 +50,7 @@ export function IntentInput() {
             key={phrase}
             type="button"
             onClick={() => setText(phrase)}
-            className="rounded-full border border-ink-200 bg-white px-2.5 py-1 text-xs text-ink-600 hover:bg-ink-50"
+            className="chip px-2.5 py-1 text-xs text-ink-600"
           >
             {phrase}
           </button>

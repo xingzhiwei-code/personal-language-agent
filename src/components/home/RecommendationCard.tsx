@@ -20,7 +20,7 @@ export function RecommendationCard({ recommendation }: { recommendation: Recomme
   const clientToken = `rec-${recommendation.id}-${tokenId}`;
 
   return (
-    <Card className="border-accent-100 bg-gradient-to-b from-accent-50/60 to-white">
+    <Card className="bg-gradient-to-b from-accent-50/60 to-white/40">
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="text-lg font-semibold">
           {ACTIVITY_LABELS[recommendation.activityType] ?? recommendation.activityType}
@@ -68,7 +68,7 @@ export function RecommendationCard({ recommendation }: { recommendation: Recomme
       </div>
 
       {showWhy ? (
-        <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 rounded-xl bg-white/80 p-3 text-xs text-ink-600 sm:grid-cols-3">
+        <dl className="glass-soft mt-3 grid grid-cols-2 gap-x-4 gap-y-1 rounded-2xl p-3 text-xs text-ink-600 sm:grid-cols-3">
           {Object.entries(recommendation.factors).map(([key, value]) => (
             <div key={key} className="flex justify-between gap-2">
               <dt className="text-ink-400">{FACTOR_LABELS[key] ?? key}</dt>

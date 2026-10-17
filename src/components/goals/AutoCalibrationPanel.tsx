@@ -39,12 +39,12 @@ export function AutoCalibrationPanel({
         <button
           type="submit"
           aria-pressed={enabled}
-          className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
-            enabled ? 'bg-accent-500' : 'bg-ink-200'
+          className={`switch-track relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+            enabled ? 'switch-on' : ''
           }`}
         >
           <span
-            className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${
+            className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-[0_2px_8px_rgba(0,0,0,0.22)] transition-all ${
               enabled ? 'left-[22px]' : 'left-0.5'
             }`}
           />
@@ -52,7 +52,7 @@ export function AutoCalibrationPanel({
       </form>
 
       {suggestion ? (
-        <div className="rounded-xl border border-accent-200 bg-accent-50/60 p-3">
+        <div className="rounded-2xl bg-accent-50/60 p-3">
           <p className="text-sm text-ink-900">
             你的水平可能在 <span className="font-semibold tabular-nums">{suggestion.suggestedValue}</span>{' '}
             左右（之前是 {suggestion.currentValue}），要更新吗？

@@ -20,7 +20,7 @@ export function PathBar({
   const activeProgress = active ? progress[active.id] : undefined;
 
   return (
-    <div className="rounded-2xl border border-ink-200 bg-white p-4">
+    <div className="glass-soft rounded-3xl p-4">
       <div className="flex flex-wrap items-center gap-1.5">
         {phases.map((phase, index) => (
           <div key={phase.id} className="flex items-center gap-1.5">
@@ -31,7 +31,7 @@ export function PathBar({
                   ? 'bg-accent-500 text-white'
                   : phase.status === 'done'
                     ? 'bg-accent-100 text-accent-600'
-                    : 'bg-ink-100 text-ink-400'
+                    : 'bg-white/50 text-ink-400'
               }`}
             >
               {phase.status === 'done' ? '✓ ' : ''}

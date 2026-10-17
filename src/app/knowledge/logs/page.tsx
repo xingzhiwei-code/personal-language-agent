@@ -109,7 +109,7 @@ function FilterLink({ href, active, children }: { href: string; active: boolean;
     <Link
       href={href}
       className={`rounded-full px-3 py-1.5 text-xs font-medium ${
-        active ? 'bg-accent-500 text-white' : 'border border-ink-200 bg-white text-ink-600'
+        active ? 'bg-accent-500 text-white' : 'glass-soft text-ink-600'
       }`}
     >
       {children}

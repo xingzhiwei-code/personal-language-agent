@@ -171,7 +171,7 @@ export default async function KnowledgePage({
             <ul className="space-y-2">
               {items.map(({ item, state }) => (
                 <li key={item.id}>
-                  <Link href={`/knowledge/${item.id}`} className="block rounded-2xl border border-ink-200 bg-white p-4 hover:bg-ink-50">
+                  <Link href={`/knowledge/${item.id}`} className="glass-soft block rounded-2xl p-4 transition-transform active:scale-[0.99]">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-sm font-medium">{item.text}</span>
                       <Badge>{KNOWLEDGE_TYPE_LABELS[item.type]}</Badge>

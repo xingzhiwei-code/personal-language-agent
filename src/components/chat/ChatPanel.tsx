@@ -92,7 +92,7 @@ export function ChatPanel({
 
       <div
         ref={listRef}
-        className="max-h-[52vh] min-h-[220px] space-y-3 overflow-y-auto rounded-2xl border border-ink-200 bg-white p-4"
+        className="glass-soft max-h-[52vh] min-h-[220px] space-y-3 overflow-y-auto rounded-2xl p-4"
         aria-live="polite"
       >
         {messages.length === 0 ? (
@@ -190,7 +190,7 @@ export function ChatPanel({
           onChange={(event) => setText(event.target.value)}
           placeholder="说点什么…"
           aria-label="输入消息"
-          className="min-w-0 flex-1 rounded-xl border border-ink-200 bg-white px-3 py-2.5 text-sm outline-none"
+          className="glass-input min-w-0 flex-1 rounded-xl border border-ink-200 px-3 py-2.5 text-sm outline-none"
           maxLength={2000}
           data-testid="chat-input"
         />

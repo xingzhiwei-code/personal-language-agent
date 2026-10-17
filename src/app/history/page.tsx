@@ -31,7 +31,7 @@ export default async function HistoryPage() {
             <li key={entry.session.id}>
               <Link
                 href={`/history/${entry.session.id}`}
-                className="block rounded-2xl border border-ink-200 bg-white p-4 hover:bg-ink-50"
+                className="glass-soft block rounded-2xl p-4 transition-transform active:scale-[0.99]"
               >
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-sm font-medium">

@@ -48,7 +48,7 @@ export function GoalForm({ redirectTo = '/' }: { redirectTo?: string }) {
           value={text}
           onChange={(event) => setText(event.target.value)}
           placeholder="例如：我想提高英语口语"
-          className="mt-2 w-full resize-none rounded-xl border border-ink-200 bg-white px-3 py-2.5 text-sm outline-none placeholder:text-ink-400"
+          className="glass-input mt-2 w-full resize-none rounded-xl border border-ink-200 px-3 py-2.5 text-sm outline-none placeholder:text-ink-400"
         />
       </div>
 
@@ -58,7 +58,7 @@ export function GoalForm({ redirectTo = '/' }: { redirectTo?: string }) {
             key={example}
             type="button"
             onClick={() => setText(example)}
-            className="rounded-full border border-ink-200 bg-white px-2.5 py-1 text-xs text-ink-600 hover:bg-ink-50"
+            className="chip px-2.5 py-1 text-xs text-ink-600"
           >
             {example}
           </button>
@@ -72,7 +72,7 @@ export function GoalForm({ redirectTo = '/' }: { redirectTo?: string }) {
         <select
           id="goal-minutes"
           name="minutes"
-          className="mt-2 rounded-xl border border-ink-200 bg-white px-3 py-2.5 text-sm"
+          className="glass-input mt-2 rounded-xl border border-ink-200 px-3 py-2.5 text-sm"
           defaultValue=""
         >
           <option value="">先不填</option>
@@ -91,7 +91,7 @@ export function GoalForm({ redirectTo = '/' }: { redirectTo?: string }) {
         <select
           id="goal-type"
           name="goalType"
-          className="mt-2 rounded-xl border border-ink-200 bg-white px-3 py-2.5 text-sm"
+          className="glass-input mt-2 rounded-xl border border-ink-200 px-3 py-2.5 text-sm"
           defaultValue=""
         >
           <option value="">自动识别</option>

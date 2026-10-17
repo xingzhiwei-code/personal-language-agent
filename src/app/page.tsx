@@ -69,7 +69,7 @@ async function HomeContent() {
       </header>
 
       {!view.placement ? (
-        <Card className="border-accent-100 bg-accent-50/60">
+        <Card className="bg-accent-50/60">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-sm font-medium">还没校准你的起点</p>
@@ -85,7 +85,7 @@ async function HomeContent() {
       ) : null}
 
       {view.resumable ? (
-        <Card className="border-amber-200 bg-amber-50/60">
+        <Card className="bg-amber-50/60">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-sm font-medium">
@@ -138,7 +138,7 @@ async function HomeContent() {
             <input type="hidden" name="clientToken" value={`chat-${Date.now()}`} />
             <button
               type="submit"
-              className="w-full rounded-2xl border border-ink-200 bg-white p-4 text-left hover:bg-ink-50"
+              className="glass-soft w-full rounded-2xl p-4 text-left transition-transform active:scale-[0.97]"
               data-testid="start-chat"
             >
               <span className="block text-sm font-medium">自由聊天</span>
@@ -154,7 +154,7 @@ async function HomeContent() {
             <input type="hidden" name="clientToken" value={`quick-${Date.now()}`} />
             <button
               type="submit"
-              className="w-full rounded-2xl border border-ink-200 bg-white p-4 text-left hover:bg-ink-50 disabled:opacity-50"
+              className="glass-soft w-full rounded-2xl p-4 text-left transition-transform active:scale-[0.97] disabled:opacity-50"
               disabled={view.stats.knowledgeCount === 0}
               data-testid="start-quick-review"
             >
@@ -171,7 +171,7 @@ async function HomeContent() {
 
           <Link
             href="/chat?ask=1"
-            className="block rounded-2xl border border-ink-200 bg-white p-4 hover:bg-ink-50"
+            className="glass-soft block rounded-2xl p-4 transition-transform active:scale-[0.97]"
           >
             <span className="block text-sm font-medium">问个语言问题</span>
             <span className="mt-0.5 block text-xs text-ink-400">先回答你，再问要不要练</span>

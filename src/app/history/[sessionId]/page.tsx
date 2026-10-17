@@ -75,7 +75,7 @@ export default async function SessionDetailPage({
               return (
                 <li
                   key={assessment.id}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-ink-200 px-3 py-2"
+                  className="glass-soft flex flex-wrap items-center justify-between gap-2 rounded-xl px-3 py-2"
                 >
                   <span>
                     {item ? (

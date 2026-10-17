@@ -180,7 +180,7 @@ export default async function LearnPage({
                 {summary.difficulties.map((text) => (
                   <li
                     key={text}
-                    className="rounded-full bg-ink-100 px-2 py-0.5 text-xs text-ink-600"
+                    className="chip px-2 py-0.5 text-xs text-ink-600"
                   >
                     {text}
                   </li>
@@ -199,7 +199,7 @@ export default async function LearnPage({
                     <li key={id}>
                       <Link
                         href={`/knowledge/${id}`}
-                        className="rounded-full border border-ink-200 px-2 py-0.5 text-xs text-ink-600 hover:bg-ink-50"
+                        className="chip px-2 py-0.5 text-xs text-ink-600"
                       >
                         {item.text}
                       </Link>

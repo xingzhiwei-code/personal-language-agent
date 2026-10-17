@@ -63,7 +63,7 @@ export function PlacementForm() {
               maxLength={200}
               value={note}
               onChange={(event) => setNote(event.target.value)}
-              className="mt-1.5 w-full resize-none rounded-xl border border-ink-200 bg-white px-3 py-2 text-sm outline-none placeholder:text-ink-400"
+              className="glass-input mt-1.5 w-full resize-none rounded-xl border border-ink-200 px-3 py-2 text-sm outline-none placeholder:text-ink-400"
             />
           </div>
           {selfState && !selfState.ok ? <ErrorNote>{selfState.message}</ErrorNote> : null}
@@ -88,7 +88,7 @@ export function PlacementForm() {
               max={9}
               step={0.5}
               required
-              className="mt-1.5 w-28 rounded-xl border border-ink-200 bg-white px-3 py-2 text-sm outline-none"
+              className="glass-input mt-1.5 w-28 rounded-xl border border-ink-200 px-3 py-2 text-sm outline-none"
             />
           </div>
           <button type="submit" className={buttonStyles.secondary} disabled={overridePending}>

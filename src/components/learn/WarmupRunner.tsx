@@ -42,11 +42,26 @@ export function WarmupRunner({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between text-xs text-ink-400">
-        <span>
-          热身 {position} / {total}
-        </span>
-        <Badge>只曝光 · 不计分</Badge>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between text-xs text-ink-400">
+          <span>
+            热身 {position} / {total}
+          </span>
+          <Badge>只曝光 · 不计分</Badge>
+        </div>
+        <div
+          className="meter-track w-full"
+          role="progressbar"
+          aria-valuenow={position}
+          aria-valuemin={1}
+          aria-valuemax={Math.max(1, total)}
+          aria-label="热身进度"
+        >
+          <div
+            className="meter-fill"
+            style={{ width: `${Math.round((position / Math.max(1, total)) * 100)}%` }}
+          />
+        </div>
       </div>
 
       <Card className="text-center">
@@ -57,7 +72,7 @@ export function WarmupRunner({
               type="button"
               onClick={replay}
               aria-label={`播放 ${word} 的发音`}
-              className="rounded-full border border-ink-200 px-2.5 py-1.5 text-sm hover:bg-ink-50"
+              className="chip px-2.5 py-1.5 text-sm"
             >
               🔊
             </button>
@@ -70,7 +85,7 @@ export function WarmupRunner({
           <p className="mt-3 text-sm text-ink-400">这条还没有释义</p>
         )}
         {span ? (
-          <blockquote className="mt-4 rounded-xl bg-ink-50 px-4 py-3 text-sm text-ink-600">
+          <blockquote className="glass-soft mt-4 rounded-xl px-4 py-3 text-sm text-ink-600">
             <p>“{span.text}”</p>
             {span.source ? <p className="mt-1 text-xs text-ink-400">来自：{span.source}</p> : null}
           </blockquote>

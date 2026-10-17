@@ -59,7 +59,7 @@ export default async function SettingsPage() {
           </div>
         </dl>
         {!aiAvailable ? (
-          <p className="mt-3 rounded-xl bg-ink-50 px-3 py-2 text-xs text-ink-600">
+          <p className="glass-soft mt-3 rounded-xl px-3 py-2 text-xs text-ink-600">
             要启用对话和解释，在项目根目录创建 <code>.env.local</code>，填入{' '}
             <code>LLA_LLM_BASE_URL</code>、<code>LLA_LLM_API_KEY</code>、
             <code>LLA_LLM_MODEL</code>（任何 OpenAI 兼容服务都可以），然后重启开发服务器。
@@ -97,7 +97,7 @@ export default async function SettingsPage() {
             {memories.map((memory) => (
               <li
                 key={memory.id}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-ink-200 px-3 py-2 text-sm"
+                className="glass-soft flex flex-wrap items-center justify-between gap-2 rounded-xl px-3 py-2 text-sm"
               >
                 <span>
                   {memory.content}

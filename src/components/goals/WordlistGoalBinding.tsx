@@ -15,7 +15,7 @@ export function WordlistGoalBinding({ wordlist, goals }: { wordlist: Wordlist; g
   }, [state, router]);
 
   return (
-    <form action={action} className="flex flex-wrap items-end gap-2 rounded-xl border border-ink-100 p-3">
+    <form action={action} className="glass-soft flex flex-wrap items-end gap-2 rounded-2xl p-3">
       <input type="hidden" name="wordlistId" value={wordlist.id} />
       <div className="min-w-40 flex-1">
         <p className="text-sm font-medium">{wordlist.name}</p>

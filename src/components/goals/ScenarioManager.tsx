@@ -105,7 +105,7 @@ export function ScenarioManager({
       </Card>
 
       {bigScenarios.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-ink-200 p-5 text-center text-sm text-ink-400">还没有场景。场景只能由你主动创建，系统不会从对话中偷偷推断。</p>
+        <p className="glass-soft rounded-2xl p-5 text-center text-sm text-ink-400">还没有场景。场景只能由你主动创建，系统不会从对话中偷偷推断。</p>
       ) : (
         <div className="space-y-3">
           {bigScenarios.map((scenario) => (
