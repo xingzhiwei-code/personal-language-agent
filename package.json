@@ -15,6 +15,7 @@
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx scripts/migrate.ts",
+    "copy:local-to-turso": "tsx scripts/copy-local-to-turso.ts",
     "import:word-relations": "tsx scripts/import-word-relations.ts",
     "build:wordnet-relations": "tsx scripts/build-wordnet-relations.ts",
     "test": "vitest run",
