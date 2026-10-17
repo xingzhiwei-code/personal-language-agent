@@ -27,3 +27,7 @@ test-results/
 coverage/
 
 .DS_Store
+
+# WordNet 3.1 raw wndb data (dev-time input for build-wordnet-relations.ts).
+# The derived, anchor-filtered relations JSON is versioned instead.
+scripts/data/wordnet-3.1/
