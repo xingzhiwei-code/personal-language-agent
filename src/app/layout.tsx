@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import Link from 'next/link';
 import { APP_VERSION_LABEL } from '@/config/version';
+import { MobileNav } from '@/components/MobileNav';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -57,13 +58,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </div>
 
         {/* Mobile bottom navigation — floating frosted glass pill */}
-        <nav aria-label="主导航" className="glass-nav sm:hidden">
-          {NAV.map((item) => (
-            <Link key={item.href} href={item.href}>
-              {item.label}
-            </Link>
-          ))}
-        </nav>
+        <MobileNav items={NAV} />
       </body>
     </html>
   );
