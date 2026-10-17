@@ -5,8 +5,8 @@ import { createTestHarness, type TestHarness } from '../helpers/context';
 describe('word-relation import (v0.5 §W1)', () => {
   let h: TestHarness;
 
-  beforeEach(() => {
-    h = createTestHarness();
+  beforeEach(async () => {
+    h = await createTestHarness();
   });
 
   afterEach(() => h.cleanup());

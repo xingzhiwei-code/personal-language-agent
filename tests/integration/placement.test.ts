@@ -34,8 +34,8 @@ function answerFor(activity: LearningActivity): { answer: string | null; selfRat
 describe('placement session (v0.4 §G1)', () => {
   let h: TestHarness;
 
-  beforeEach(() => {
-    h = createTestHarness();
+  beforeEach(async () => {
+    h = await createTestHarness();
     h.llm.configured = false;
   });
 

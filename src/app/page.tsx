@@ -23,7 +23,7 @@ import { app } from '@/server/app';
 export const dynamic = 'force-dynamic';
 
 async function HomeContent() {
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   const view = await getHomeView(ctx, learnerId);
 
   if (!view.hasGoal) {

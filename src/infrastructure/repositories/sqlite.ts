@@ -127,12 +127,13 @@ export function createSqliteRepositories(db: Db): Repositories {
       return goal;
     },
     async createAsPrimary(goal: Goal) {
-      db.transaction((tx) => {
-        tx.update(t.goals)
+      await db.transaction(async (tx) => {
+        await tx
+          .update(t.goals)
           .set({ isPrimary: false, priority: 2 })
           .where(eq(t.goals.learnerId, goal.learnerId))
           .run();
-        tx.insert(t.goals).values({ ...goal, isPrimary: true, priority: 1 }).run();
+        await tx.insert(t.goals).values({ ...goal, isPrimary: true, priority: 1 }).run();
       });
       return { ...goal, isPrimary: true, priority: 1 };
     },
@@ -141,12 +142,14 @@ export function createSqliteRepositories(db: Db): Repositories {
       return goal;
     },
     async setPrimary(goal: Goal) {
-      db.transaction((tx) => {
-        tx.update(t.goals)
+      await db.transaction(async (tx) => {
+        await tx
+          .update(t.goals)
           .set({ isPrimary: false, priority: 2 })
           .where(eq(t.goals.learnerId, goal.learnerId))
           .run();
-        tx.update(t.goals)
+        await tx
+          .update(t.goals)
           .set({ ...goal, isPrimary: true, priority: 1, status: 'active' })
           .where(and(eq(t.goals.id, goal.id), eq(t.goals.learnerId, goal.learnerId)))
           .run();
@@ -1086,56 +1089,65 @@ export function createSqliteRepositories(db: Db): Repositories {
     goalPhases: goalPhasesRepo,
     wordRelations: wordRelationsRepo,
     async deleteAllForLearner(learnerId: string) {
-      const goalRows = db
+      const goalRows = await db
         .select({ id: t.goals.id })
         .from(t.goals)
         .where(eq(t.goals.learnerId, learnerId))
         .all();
       const goalIds = goalRows.map((row) => row.id);
-      db.transaction((tx) => {
-        tx.delete(t.assessments).where(eq(t.assessments.learnerId, learnerId)).run();
-        tx.delete(t.learningEvents).where(eq(t.learningEvents.learnerId, learnerId)).run();
-        tx.delete(t.learningActivities)
+      await db.transaction(async (tx) => {
+        await tx.delete(t.assessments).where(eq(t.assessments.learnerId, learnerId)).run();
+        await tx.delete(t.learningEvents).where(eq(t.learningEvents.learnerId, learnerId)).run();
+        await tx
+          .delete(t.learningActivities)
           .where(eq(t.learningActivities.learnerId, learnerId))
           .run();
-        tx.delete(t.chatMessages).where(eq(t.chatMessages.learnerId, learnerId)).run();
-        tx.delete(t.learningSessions)
+        await tx.delete(t.chatMessages).where(eq(t.chatMessages.learnerId, learnerId)).run();
+        await tx
+          .delete(t.learningSessions)
           .where(eq(t.learningSessions.learnerId, learnerId))
           .run();
-        tx.delete(t.knowledgeRelations)
+        await tx
+          .delete(t.knowledgeRelations)
           .where(eq(t.knowledgeRelations.learnerId, learnerId))
           .run();
-        tx.delete(t.knowledgeItems).where(eq(t.knowledgeItems.learnerId, learnerId)).run();
-        tx.delete(t.learnerStates).where(eq(t.learnerStates.learnerId, learnerId)).run();
-        tx.delete(t.learningTargets)
+        await tx.delete(t.knowledgeItems).where(eq(t.knowledgeItems.learnerId, learnerId)).run();
+        await tx.delete(t.learnerStates).where(eq(t.learnerStates.learnerId, learnerId)).run();
+        await tx
+          .delete(t.learningTargets)
           .where(eq(t.learningTargets.learnerId, learnerId))
           .run();
-        tx.delete(t.placements).where(eq(t.placements.learnerId, learnerId)).run();
+        await tx.delete(t.placements).where(eq(t.placements.learnerId, learnerId)).run();
         if (goalIds.length > 0) {
-          tx.delete(t.goalPhases).where(inArray(t.goalPhases.goalId, goalIds)).run();
+          await tx.delete(t.goalPhases).where(inArray(t.goalPhases.goalId, goalIds)).run();
         }
-        tx.delete(t.goals).where(eq(t.goals.learnerId, learnerId)).run();
-        tx.delete(t.memories).where(eq(t.memories.learnerId, learnerId)).run();
-        tx.delete(t.learningPreferences)
+        await tx.delete(t.goals).where(eq(t.goals.learnerId, learnerId)).run();
+        await tx.delete(t.memories).where(eq(t.memories.learnerId, learnerId)).run();
+        await tx
+          .delete(t.learningPreferences)
           .where(eq(t.learningPreferences.learnerId, learnerId))
           .run();
-        tx.delete(t.userContexts).where(eq(t.userContexts.learnerId, learnerId)).run();
-        tx.delete(t.recommendations)
+        await tx.delete(t.userContexts).where(eq(t.userContexts.learnerId, learnerId)).run();
+        await tx
+          .delete(t.recommendations)
           .where(eq(t.recommendations.learnerId, learnerId))
           .run();
-        tx.delete(t.transferEvidences)
+        await tx
+          .delete(t.transferEvidences)
           .where(eq(t.transferEvidences.learnerId, learnerId))
           .run();
-        tx.delete(t.contents).where(eq(t.contents.learnerId, learnerId)).run();
-        tx.delete(t.contentSources).where(eq(t.contentSources.learnerId, learnerId)).run();
-        tx.delete(t.wordlists).where(eq(t.wordlists.learnerId, learnerId)).run();
-        tx.delete(t.importExportHistory)
+        await tx.delete(t.contents).where(eq(t.contents.learnerId, learnerId)).run();
+        await tx.delete(t.contentSources).where(eq(t.contentSources.learnerId, learnerId)).run();
+        await tx.delete(t.wordlists).where(eq(t.wordlists.learnerId, learnerId)).run();
+        await tx
+          .delete(t.importExportHistory)
           .where(eq(t.importExportHistory.learnerId, learnerId))
           .run();
-        tx.delete(t.knowledgeOperationLog)
+        await tx
+          .delete(t.knowledgeOperationLog)
           .where(eq(t.knowledgeOperationLog.learnerId, learnerId))
           .run();
-        tx.delete(t.scenarios).where(eq(t.scenarios.learnerId, learnerId)).run();
+        await tx.delete(t.scenarios).where(eq(t.scenarios.learnerId, learnerId)).run();
       });
     },
   };
@@ -1147,8 +1159,8 @@ export function createSqliteRepositories(db: Db): Repositories {
 export function createSessionStartRepository(db: Db): SessionStartRepository {
   return {
     async commit(input) {
-      return db.transaction((tx) => {
-        const existingRows = tx
+      return await db.transaction(async (tx) => {
+        const existingRows = await tx
           .select()
           .from(t.learningSessions)
           .where(
@@ -1161,17 +1173,18 @@ export function createSessionStartRepository(db: Db): SessionStartRepository {
           .all();
         if (existingRows[0]) {
           const existing = toSession(existingRows[0]);
-          const activities = tx
-            .select()
-            .from(t.learningActivities)
-            .where(eq(t.learningActivities.sessionId, existing.id))
-            .orderBy(asc(t.learningActivities.position))
-            .all()
-            .map(toActivity);
+          const activities = (
+            await tx
+              .select()
+              .from(t.learningActivities)
+              .where(eq(t.learningActivities.sessionId, existing.id))
+              .orderBy(asc(t.learningActivities.position))
+              .all()
+          ).map(toActivity);
           return { session: existing, activities, created: false };
         }
         if (input.recommendationId) {
-          const claimed = tx
+          const claimed = await tx
             .update(t.recommendations)
             .set({ status: 'accepted' })
             .where(
@@ -1182,14 +1195,14 @@ export function createSessionStartRepository(db: Db): SessionStartRepository {
               ),
             )
             .run();
-          if (claimed.changes !== 1) return null;
+          if (claimed.rowsAffected !== 1) return null;
         }
-        tx.insert(t.learningSessions).values(input.session).run();
+        await tx.insert(t.learningSessions).values(input.session).run();
         if (input.activities.length > 0) {
-          tx.insert(t.learningActivities).values(input.activities).run();
+          await tx.insert(t.learningActivities).values(input.activities).run();
         }
         for (const event of input.events) {
-          tx.insert(t.learningEvents).values(event).onConflictDoNothing().run();
+          await tx.insert(t.learningEvents).values(event).onConflictDoNothing().run();
         }
         return { session: input.session, activities: input.activities, created: true };
       });
@@ -1244,10 +1257,10 @@ export function createLearnerDataExportRepository(db: Db): LearnerDataExportRepo
 export function createKnowledgePoolRepository(db: Db): KnowledgePoolRepository {
   return {
     async promote(batch) {
-      return db.transaction((tx) => {
+      return await db.transaction(async (tx) => {
         let allowance = batch.itemIds.length;
         if (batch.automaticBudget) {
-          const rows = tx
+          const rows = await tx
             .select({ payload: t.learningEvents.payload })
             .from(t.learningEvents)
             .where(
@@ -1273,7 +1286,7 @@ export function createKnowledgePoolRepository(db: Db): KnowledgePoolRepository {
         }
         if (allowance === 0 || batch.itemIds.length === 0) return [];
 
-        const rows = tx
+        const rows = await tx
           .select()
           .from(t.knowledgeItems)
           .where(
@@ -1293,7 +1306,8 @@ export function createKnowledgePoolRepository(db: Db): KnowledgePoolRepository {
         const selectedIds = new Set(selected.map((row) => row.id));
 
         for (const row of selected) {
-          tx.update(t.knowledgeItems)
+          await tx
+            .update(t.knowledgeItems)
             .set({ status: 'active', updatedAt: batch.event.occurredAt })
             .where(
               and(
@@ -1306,13 +1320,14 @@ export function createKnowledgePoolRepository(db: Db): KnowledgePoolRepository {
         }
         const states = batch.states.filter((state) => selectedIds.has(state.subjectId));
         if (states.length > 0) {
-          tx.insert(t.learnerStates).values(states).onConflictDoNothing().run();
+          await tx.insert(t.learnerStates).values(states).onConflictDoNothing().run();
         }
         const logs = batch.logs.filter(
           (entry) => entry.knowledgeItemId !== null && selectedIds.has(entry.knowledgeItemId),
         );
-        if (logs.length > 0) tx.insert(t.knowledgeOperationLog).values(logs).run();
-        tx.insert(t.learningEvents)
+        if (logs.length > 0) await tx.insert(t.knowledgeOperationLog).values(logs).run();
+        await tx
+          .insert(t.learningEvents)
           .values({
             ...batch.event,
             payload: {
@@ -1329,9 +1344,9 @@ export function createKnowledgePoolRepository(db: Db): KnowledgePoolRepository {
       });
     },
     async pause(input) {
-      return db.transaction((tx) => {
+      return await db.transaction(async (tx) => {
         if (input.itemIds.length === 0) return [];
-        const rows = tx
+        const rows = await tx
           .select()
           .from(t.knowledgeItems)
           .where(
@@ -1344,13 +1359,15 @@ export function createKnowledgePoolRepository(db: Db): KnowledgePoolRepository {
           .all();
         const selectedIds = new Set(rows.map((row) => row.id));
         for (const row of rows) {
-          tx.update(t.knowledgeItems)
+          await tx
+            .update(t.knowledgeItems)
             .set({ status: 'new', updatedAt: input.nowIso })
             .where(eq(t.knowledgeItems.id, row.id))
             .run();
         }
         if (selectedIds.size > 0) {
-          tx.update(t.learnerStates)
+          await tx
+            .update(t.learnerStates)
             .set({ nextReviewAt: null, updatedAt: input.nowIso })
             .where(
               and(
@@ -1363,7 +1380,7 @@ export function createKnowledgePoolRepository(db: Db): KnowledgePoolRepository {
           const logs = input.logs.filter(
             (entry) => entry.knowledgeItemId !== null && selectedIds.has(entry.knowledgeItemId),
           );
-          if (logs.length > 0) tx.insert(t.knowledgeOperationLog).values(logs).run();
+          if (logs.length > 0) await tx.insert(t.knowledgeOperationLog).values(logs).run();
         }
         return rows.map((row) =>
           toKnowledgeItem({ ...row, status: 'new', updatedAt: input.nowIso }),
@@ -1378,8 +1395,8 @@ export function createFileImportRepository(db: Db): FileImportRepository {
     async commit(batch) {
       const fileHash = batch.history.fileHash;
       if (!fileHash) throw new Error('File import requires a hash');
-      return db.transaction((tx) => {
-        const duplicateRows = tx
+      return await db.transaction(async (tx) => {
+        const duplicateRows = await tx
           .select()
           .from(t.importExportHistory)
           .where(
@@ -1403,7 +1420,7 @@ export function createFileImportRepository(db: Db): FileImportRepository {
             wordlistId: original.wordlistId,
             goalId: original.goalId,
           };
-          tx.insert(t.importExportHistory).values(duplicateAttempt).run();
+          await tx.insert(t.importExportHistory).values(duplicateAttempt).run();
           return {
             duplicateFile: true,
             history: duplicateAttempt,
@@ -1413,7 +1430,7 @@ export function createFileImportRepository(db: Db): FileImportRepository {
           };
         }
 
-        const existingRows = tx
+        const existingRows = await tx
           .select({ normalizedText: t.knowledgeItems.normalizedText })
           .from(t.knowledgeItems)
           .where(
@@ -1445,15 +1462,17 @@ export function createFileImportRepository(db: Db): FileImportRepository {
         };
         const wordlist = { ...batch.wordlist, itemCount: insertedItems.length };
 
-        tx.insert(t.wordlists).values(wordlist).run();
+        await tx.insert(t.wordlists).values(wordlist).run();
         for (let offset = 0; offset < insertedItems.length; offset += 200) {
-          tx.insert(t.knowledgeItems)
+          await tx
+            .insert(t.knowledgeItems)
             .values(insertedItems.slice(offset, offset + 200))
             .run();
         }
         const states = batch.states.filter((state) => insertedIds.has(state.subjectId));
         for (let offset = 0; offset < states.length; offset += 200) {
-          tx.insert(t.learnerStates)
+          await tx
+            .insert(t.learnerStates)
             .values(states.slice(offset, offset + 200))
             .onConflictDoNothing()
             .run();
@@ -1462,24 +1481,27 @@ export function createFileImportRepository(db: Db): FileImportRepository {
           (entry) => entry.knowledgeItemId !== null && insertedIds.has(entry.knowledgeItemId),
         );
         for (let offset = 0; offset < logs.length; offset += 200) {
-          tx.insert(t.knowledgeOperationLog)
+          await tx
+            .insert(t.knowledgeOperationLog)
             .values(logs.slice(offset, offset + 200))
             .run();
         }
 
         // Fill-only completion (v0.3 §P5): never overwrite an existing value.
         for (const completion of batch.completions) {
-          tx.update(t.knowledgeItems)
+          await tx
+            .update(t.knowledgeItems)
             .set(completion)
             .where(eq(t.knowledgeItems.id, completion.id))
             .run();
         }
         for (let offset = 0; offset < batch.completionLogs.length; offset += 200) {
-          tx.insert(t.knowledgeOperationLog)
+          await tx
+            .insert(t.knowledgeOperationLog)
             .values(batch.completionLogs.slice(offset, offset + 200))
             .run();
         }
-        tx.insert(t.importExportHistory).values(history).run();
+        await tx.insert(t.importExportHistory).values(history).run();
 
         return {
           duplicateFile: false,

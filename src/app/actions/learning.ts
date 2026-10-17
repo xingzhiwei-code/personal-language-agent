@@ -50,7 +50,7 @@ export async function createGoalAction(
   _prev: ActionResult<{ goalId: string }> | null,
   formData: FormData,
 ): Promise<ActionResult<{ goalId: string }>> {
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   const text = String(formData.get('text') ?? '').trim();
   const minutesRaw = String(formData.get('minutes') ?? '').trim();
   const minutes = minutesRaw.length > 0 ? Number.parseInt(minutesRaw, 10) : null;
@@ -79,7 +79,7 @@ export async function updateGoalAction(
   _prev: ActionResult | null,
   formData: FormData,
 ): Promise<ActionResult> {
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   try {
     const statusRaw = formData.get('status');
     const status = statusRaw ? goalStatusSchema.safeParse(String(statusRaw)) : null;
@@ -104,7 +104,7 @@ export async function captureContextAction(
   _prev: ActionResult<{ intent: string; minutes: number | null }> | null,
   formData: FormData,
 ): Promise<ActionResult<{ intent: string; minutes: number | null }>> {
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   const text = String(formData.get('text') ?? '').trim();
   if (text.length === 0) return { ok: false, message: '请先输入一句话' };
 
@@ -134,7 +134,7 @@ function buildContextMessage(intent: string, minutes: number | null): string {
 }
 
 export async function startSessionAction(formData: FormData): Promise<void> {
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   const parsedActivityType = activityTypeSchema.safeParse(
     String(formData.get('activityType') ?? 'quick_review'),
   );
@@ -165,7 +165,7 @@ export async function submitAnswerAction(
   _prev: ActionResult<AnswerFeedbackData> | null,
   formData: FormData,
 ): Promise<ActionResult<AnswerFeedbackData>> {
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   const sessionId = String(formData.get('sessionId') ?? '');
   const activityId = String(formData.get('activityId') ?? '');
   const answer = formData.get('answer') ? String(formData.get('answer')) : null;
@@ -200,7 +200,7 @@ export async function submitAnswerAction(
 }
 
 export async function skipActivityAction(formData: FormData): Promise<void> {
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   const sessionId = String(formData.get('sessionId') ?? '');
   await skipActivity(ctx, {
     learnerId,
@@ -211,7 +211,7 @@ export async function skipActivityAction(formData: FormData): Promise<void> {
 }
 
 export async function advanceWarmupAction(formData: FormData): Promise<void> {
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   const sessionId = String(formData.get('sessionId') ?? '');
   await advanceWarmup(ctx, {
     learnerId,
@@ -222,21 +222,21 @@ export async function advanceWarmupAction(formData: FormData): Promise<void> {
 }
 
 export async function skipWarmupAction(formData: FormData): Promise<void> {
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   const sessionId = String(formData.get('sessionId') ?? '');
   await skipWarmup(ctx, { learnerId, sessionId });
   revalidatePath(`/learn/${sessionId}`);
 }
 
 export async function pauseSessionAction(formData: FormData): Promise<void> {
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   await pauseSession(ctx, { learnerId, sessionId: String(formData.get('sessionId') ?? '') });
   revalidatePath('/');
   redirect('/');
 }
 
 export async function resumeSessionAction(formData: FormData): Promise<void> {
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   const sessionId = String(formData.get('sessionId') ?? '');
   const session = await resumeSession(ctx, { learnerId, sessionId });
   revalidatePath('/');
@@ -244,14 +244,14 @@ export async function resumeSessionAction(formData: FormData): Promise<void> {
 }
 
 export async function abandonSessionAction(formData: FormData): Promise<void> {
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   await abandonSession(ctx, { learnerId, sessionId: String(formData.get('sessionId') ?? '') });
   revalidatePath('/');
   redirect('/');
 }
 
 export async function completeSessionAction(formData: FormData): Promise<void> {
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   const sessionId = String(formData.get('sessionId') ?? '');
   await completeSession(ctx, { learnerId, sessionId });
   revalidatePath('/');
@@ -259,13 +259,13 @@ export async function completeSessionAction(formData: FormData): Promise<void> {
 }
 
 export async function rejectRecommendationAction(formData: FormData): Promise<void> {
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   await rejectRecommendation(ctx, learnerId, String(formData.get('recommendationId') ?? ''));
   revalidatePath('/');
 }
 
 export async function replaceDailyPlanAction(formData: FormData): Promise<void> {
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   await replaceDailyPlan(
     ctx,
     learnerId,
@@ -275,13 +275,13 @@ export async function replaceDailyPlanAction(formData: FormData): Promise<void> 
 }
 
 export async function restDailyPlanAction(): Promise<void> {
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   await restDailyPlan(ctx, learnerId);
   revalidatePath('/');
 }
 
 export async function resumeDailyPlanAction(): Promise<void> {
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   await resumeDailyPlan(ctx, learnerId);
   revalidatePath('/');
 }
@@ -290,7 +290,7 @@ export async function feedbackAction(
   _prev: ActionResult<{ message: string }> | null,
   formData: FormData,
 ): Promise<ActionResult<{ message: string }>> {
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   try {
     const result = await recordFeedback(ctx, {
       learnerId,
@@ -312,7 +312,7 @@ export async function correctAssessmentAction(
   _prev: ActionResult<{ mastery: number }> | null,
   formData: FormData,
 ): Promise<ActionResult<{ mastery: number }>> {
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   try {
     const result = await correctAssessment(ctx, {
       learnerId,
@@ -332,7 +332,7 @@ export async function correctAssessmentAction(
 
 /** Starts a level-placement session (v0.4 §G1). */
 export async function startPlacementAction(formData: FormData): Promise<void> {
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   const clientToken = String(formData.get('clientToken') ?? `placement-${Date.now()}`);
   const { session } = await startSession(ctx, {
     learnerId,
@@ -349,7 +349,7 @@ export async function selfReportPlacementAction(
   _prev: ActionResult | null,
   formData: FormData,
 ): Promise<ActionResult> {
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   const value = String(formData.get('value') ?? '') as SelfReportValue;
   const note = formData.get('note') ? String(formData.get('note')) : null;
   try {
@@ -367,7 +367,7 @@ export async function selfReportPlacementAction(
 
 /** User confirms the suggested move to the next phase (exit criteria met). */
 export async function advancePhaseAction(formData: FormData): Promise<void> {
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   await advancePhase(ctx, learnerId, String(formData.get('goalId') ?? ''));
   revalidatePath('/');
   revalidatePath('/goals');
@@ -375,7 +375,7 @@ export async function advancePhaseAction(formData: FormData): Promise<void> {
 
 /** Manual skip forward (二次确认 handled by the UI). */
 export async function skipPhaseAction(formData: FormData): Promise<void> {
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   await skipPhase(ctx, learnerId, String(formData.get('goalId') ?? ''));
   revalidatePath('/');
   revalidatePath('/goals');
@@ -383,7 +383,7 @@ export async function skipPhaseAction(formData: FormData): Promise<void> {
 
 /** Manual rollback (二次确认 handled by the UI). */
 export async function rollbackPhaseAction(formData: FormData): Promise<void> {
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   await rollbackPhase(ctx, learnerId, String(formData.get('goalId') ?? ''));
   revalidatePath('/');
   revalidatePath('/goals');
@@ -394,7 +394,7 @@ export async function overridePlacementAction(
   _prev: ActionResult | null,
   formData: FormData,
 ): Promise<ActionResult> {
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   const level = Number.parseFloat(String(formData.get('level') ?? ''));
   try {
     if (!Number.isFinite(level)) {
@@ -411,7 +411,7 @@ export async function overridePlacementAction(
 
 /** Toggles the "adaptive starting point" switch (v0.5 §W3). */
 export async function setAutoCalibrationAction(formData: FormData): Promise<void> {
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   const enabled = String(formData.get('enabled') ?? '') === 'true';
   await setAutoCalibrationEnabled(ctx, learnerId, enabled);
   revalidatePath('/');
@@ -420,7 +420,7 @@ export async function setAutoCalibrationAction(formData: FormData): Promise<void
 
 /** Applies the user-confirmed calibration suggestion (更新, v0.5 §W3). */
 export async function applyAutoCalibrationAction(formData: FormData): Promise<void> {
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   const value = Number.parseFloat(String(formData.get('value') ?? ''));
   const confidence = String(formData.get('confidence') ?? 'low') as PlacementConfidence;
   if (!Number.isFinite(value)) return;
@@ -431,7 +431,7 @@ export async function applyAutoCalibrationAction(formData: FormData): Promise<vo
 
 /** Records "保持不变" so the same suggestion is not re-surfaced (v0.5 §W3). */
 export async function acknowledgeAutoCalibrationAction(formData: FormData): Promise<void> {
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   const value = Number.parseFloat(String(formData.get('value') ?? ''));
   if (!Number.isFinite(value)) return;
   await acknowledgeAutoCalibration(ctx, learnerId, value);

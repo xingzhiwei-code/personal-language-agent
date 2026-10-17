@@ -17,8 +17,8 @@ import { createTestHarness, LOCAL_LEARNER_ID, type TestHarness } from '../helper
 describe('M7: daily pool promotion and manual flow', () => {
   let h: TestHarness;
 
-  beforeEach(() => {
-    h = createTestHarness();
+  beforeEach(async () => {
+    h = await createTestHarness();
   });
   afterEach(() => h.cleanup());
 
@@ -101,7 +101,7 @@ describe('M7: daily plan behavior', () => {
   let h: TestHarness;
 
   beforeEach(async () => {
-    h = createTestHarness();
+    h = await createTestHarness();
     await createGoalFromText(h.ctx, {
       learnerId: LOCAL_LEARNER_ID,
       text: '我要提高英语综合能力',

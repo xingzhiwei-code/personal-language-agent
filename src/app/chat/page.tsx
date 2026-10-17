@@ -11,7 +11,7 @@ export default async function ChatEntryPage({
   searchParams: Promise<{ ask?: string }>;
 }) {
   const { ask } = await searchParams;
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   const recent = await ctx.repos.sessions.listByLearner(learnerId, 5, [
     'active',
     'paused',

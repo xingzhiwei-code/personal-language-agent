@@ -12,7 +12,7 @@ const STATUS = {
 };
 
 export default async function ImportExportHistoryPage() {
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   const records = await listImportExportHistory(ctx, learnerId);
 
   return (

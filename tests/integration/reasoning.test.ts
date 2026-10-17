@@ -11,8 +11,8 @@ import { createTestHarness, type TestHarness } from '../helpers/context';
 describe('startup reason (v0.4 §G4)', () => {
   let h: TestHarness;
 
-  beforeEach(() => {
-    h = createTestHarness();
+  beforeEach(async () => {
+    h = await createTestHarness();
     h.llm.configured = false;
   });
 

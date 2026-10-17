@@ -52,7 +52,7 @@ describe('agent turns', () => {
   let harness: TestHarness;
 
   beforeEach(async () => {
-    harness = createTestHarness();
+    harness = await createTestHarness();
     await createGoalFromText(harness.ctx, {
       learnerId: LOCAL_LEARNER_ID,
       text: '我想提高英语口语',
@@ -200,8 +200,8 @@ describe('agent turns', () => {
 describe('agent tools', () => {
   let harness: TestHarness;
 
-  beforeEach(() => {
-    harness = createTestHarness();
+  beforeEach(async () => {
+    harness = await createTestHarness();
   });
 
   afterEach(() => harness.cleanup());

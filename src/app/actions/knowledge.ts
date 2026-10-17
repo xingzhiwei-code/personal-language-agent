@@ -22,7 +22,7 @@ export async function createKnowledgeAction(
   _prev: ActionResult<{ id: string; deduplicated: boolean }> | null,
   formData: FormData,
 ): Promise<ActionResult<{ id: string; deduplicated: boolean }>> {
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   const text = String(formData.get('text') ?? '').trim();
   const typeRaw = String(formData.get('type') ?? 'auto');
   const example = String(formData.get('example') ?? '').trim();
@@ -65,7 +65,7 @@ export async function updateKnowledgeAction(
   _prev: ActionResult | null,
   formData: FormData,
 ): Promise<ActionResult> {
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   const id = String(formData.get('id') ?? '');
   try {
     const typeRaw = formData.get('type');
@@ -97,7 +97,7 @@ export async function promoteKnowledgeBatchAction(
   formData: FormData,
 ): Promise<ActionResult<{ count: number }>> {
   try {
-    const { ctx, learnerId } = app();
+    const { ctx, learnerId } = await app();
     const promoted = await promoteKnowledgeItems(ctx, {
       learnerId,
       itemIds: formData.getAll('itemId').map(String),
@@ -116,7 +116,7 @@ export async function pauseKnowledgeBatchAction(
   formData: FormData,
 ): Promise<ActionResult<{ count: number }>> {
   try {
-    const { ctx, learnerId } = app();
+    const { ctx, learnerId } = await app();
     const paused = await pauseKnowledgeItems(ctx, {
       learnerId,
       itemIds: formData.getAll('itemId').map(String),
@@ -131,7 +131,7 @@ export async function pauseKnowledgeBatchAction(
 }
 
 export async function deleteKnowledgeAction(formData: FormData): Promise<void> {
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   await deleteKnowledgeItem(ctx, learnerId, String(formData.get('id') ?? ''));
   revalidatePath('/knowledge');
   redirect('/knowledge');
@@ -141,7 +141,7 @@ export async function addRelationAction(
   _prev: ActionResult | null,
   formData: FormData,
 ): Promise<ActionResult> {
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   const fromItemId = String(formData.get('fromItemId') ?? '');
   try {
     const type = knowledgeRelationTypeSchema.safeParse(String(formData.get('type') ?? 'related'));
@@ -160,7 +160,7 @@ export async function addRelationAction(
 }
 
 export async function removeRelationAction(formData: FormData): Promise<void> {
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   const itemId = String(formData.get('itemId') ?? '');
   await removeKnowledgeRelation(ctx, learnerId, String(formData.get('relationId') ?? ''));
   revalidatePath(`/knowledge/${itemId}`);

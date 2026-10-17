@@ -29,8 +29,8 @@ const VOCAB: { text: string; meaning: string }[] = [
 describe('vertical loop: goal -> recommendation -> session -> assessment -> state -> new recommendation', () => {
   let harness: TestHarness;
 
-  beforeEach(() => {
-    harness = createTestHarness();
+  beforeEach(async () => {
+    harness = await createTestHarness();
     // The whole core loop must work with NO AI provider configured.
     harness.llm.configured = false;
   });
@@ -340,7 +340,7 @@ describe('vertical loop: goal -> recommendation -> session -> assessment -> stat
       selfRating: activities[0]!.expectedAnswer ? null : 'known',
     });
 
-    const restarted = harness.reopen();
+    const restarted = await harness.reopen();
     harness = restarted;
     restarted.llm.configured = false;
 
@@ -360,8 +360,8 @@ describe('vertical loop: goal -> recommendation -> session -> assessment -> stat
 describe('the user can correct the system', () => {
   let harness: TestHarness;
 
-  beforeEach(() => {
-    harness = createTestHarness();
+  beforeEach(async () => {
+    harness = await createTestHarness();
     harness.llm.configured = false;
   });
 

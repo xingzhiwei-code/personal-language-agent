@@ -33,7 +33,7 @@ export default async function LearnPage({
 }) {
   const { sessionId } = await params;
   const { a: requestedActivityId } = await searchParams;
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   const aiAvailable = ctx.llm.isConfigured();
 
   let view;

@@ -22,8 +22,8 @@ import { createTestHarness, type TestHarness } from '../helpers/context';
 describe('knowledge graph and provenance', () => {
   let harness: TestHarness;
 
-  beforeEach(() => {
-    harness = createTestHarness();
+  beforeEach(async () => {
+    harness = await createTestHarness();
   });
 
   afterEach(() => harness.cleanup());
@@ -166,8 +166,8 @@ describe('knowledge graph and provenance', () => {
 describe('transfer evidence', () => {
   let harness: TestHarness;
 
-  beforeEach(() => {
-    harness = createTestHarness();
+  beforeEach(async () => {
+    harness = await createTestHarness();
   });
 
   afterEach(() => harness.cleanup());
@@ -206,7 +206,7 @@ describe('data management', () => {
   let harness: TestHarness;
 
   beforeEach(async () => {
-    harness = createTestHarness();
+    harness = await createTestHarness();
     await createGoalFromText(harness.ctx, {
       learnerId: LOCAL_LEARNER_ID,
       text: '我想提高英语口语',

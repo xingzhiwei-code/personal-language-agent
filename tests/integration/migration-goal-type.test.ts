@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { goals } from '@/infrastructure/db/schema';
+import { getDbClient } from '@/infrastructure/db/client';
 import { createTestHarness, type TestHarness } from '../helpers/context';
 
 /**
@@ -20,14 +21,14 @@ function backfillSql(): string {
 describe('v0.4 goal_type backfill migration', () => {
   let h: TestHarness;
 
-  beforeEach(() => {
-    h = createTestHarness();
+  beforeEach(async () => {
+    h = await createTestHarness();
   });
 
   afterEach(() => h.cleanup());
 
-  function insertLegacyGoal(id: string, title: string, rawInput: string): void {
-    h.db
+  async function insertLegacyGoal(id: string, title: string, rawInput: string): Promise<void> {
+    await h.db
       .insert(goals)
       .values({
         id,
@@ -42,19 +43,20 @@ describe('v0.4 goal_type backfill migration', () => {
       .run();
   }
 
-  function goalTypes(): Record<string, string> {
-    return Object.fromEntries(h.db.select().from(goals).all().map((goal) => [goal.id, goal.goalType]));
+  async function goalTypes(): Promise<Record<string, string>> {
+    const rows = await h.db.select().from(goals).all();
+    return Object.fromEntries(rows.map((goal) => [goal.id, goal.goalType]));
   }
 
-  it('reclassifies IELTS-keyword goals and keeps the rest general', () => {
-    insertLegacyGoal('g1', '我要准备雅思考试', '');
-    insertLegacyGoal('g2', 'Improve my IELTS writing', '');
-    insertLegacyGoal('g3', '提高商务英语', '');
-    insertLegacyGoal('g4', '日常英语积累', '目标是考雅思口语');
+  it('reclassifies IELTS-keyword goals and keeps the rest general', async () => {
+    await insertLegacyGoal('g1', '我要准备雅思考试', '');
+    await insertLegacyGoal('g2', 'Improve my IELTS writing', '');
+    await insertLegacyGoal('g3', '提高商务英语', '');
+    await insertLegacyGoal('g4', '日常英语积累', '目标是考雅思口语');
 
-    h.db.$client.exec(backfillSql());
+    await getDbClient(h.db).execute(backfillSql());
 
-    expect(goalTypes()).toEqual({
+    expect(await goalTypes()).toEqual({
       g1: 'ielts',
       g2: 'ielts',
       g3: 'general',
@@ -62,19 +64,19 @@ describe('v0.4 goal_type backfill migration', () => {
     });
   });
 
-  it('is idempotent: running twice yields the same result', () => {
-    insertLegacyGoal('g1', '我要准备雅思考试', '');
-    insertLegacyGoal('g3', '提高商务英语', '');
+  it('is idempotent: running twice yields the same result', async () => {
+    await insertLegacyGoal('g1', '我要准备雅思考试', '');
+    await insertLegacyGoal('g3', '提高商务英语', '');
 
-    h.db.$client.exec(backfillSql());
-    const first = goalTypes();
-    h.db.$client.exec(backfillSql());
-    expect(goalTypes()).toEqual(first);
+    await getDbClient(h.db).execute(backfillSql());
+    const first = await goalTypes();
+    await getDbClient(h.db).execute(backfillSql());
+    expect(await goalTypes()).toEqual(first);
     expect(first).toEqual({ g1: 'ielts', g3: 'general' });
   });
 
-  it('leaves goals already typed as ielts untouched', () => {
-    h.db
+  it('leaves goals already typed as ielts untouched', async () => {
+    await h.db
       .insert(goals)
       .values({
         id: 'g-ielts',
@@ -88,8 +90,8 @@ describe('v0.4 goal_type backfill migration', () => {
       })
       .run();
 
-    h.db.$client.exec(backfillSql());
+    await getDbClient(h.db).execute(backfillSql());
 
-    expect(goalTypes()).toEqual({ 'g-ielts': 'ielts' });
+    expect(await goalTypes()).toEqual({ 'g-ielts': 'ielts' });
   });
 });

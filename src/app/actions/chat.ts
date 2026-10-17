@@ -9,7 +9,7 @@ import { app, toActionError, type ActionResult } from '@/server/app';
 
 /** Starts (or reuses) a free-chat session and navigates into it. */
 export async function startChatAction(formData: FormData): Promise<void> {
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   const clientToken = String(formData.get('clientToken') ?? `chat-${Date.now()}`);
   const { session } = await startSession(ctx, {
     learnerId,
@@ -35,7 +35,7 @@ export async function sendChatMessageAction(
   _prev: ActionResult<ChatTurnData> | null,
   formData: FormData,
 ): Promise<ActionResult<ChatTurnData>> {
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   const sessionId = String(formData.get('sessionId') ?? '');
   const text = String(formData.get('text') ?? '').trim();
   const lastTerm = formData.get('lastTerm') ? String(formData.get('lastTerm')) : null;
@@ -63,7 +63,7 @@ export async function sendChatMessageAction(
 }
 
 export async function toggleCorrectionAction(formData: FormData): Promise<void> {
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   const sessionId = String(formData.get('sessionId') ?? '');
   await setSessionCorrection(ctx, {
     learnerId,
@@ -78,7 +78,7 @@ export async function saveTermAction(
   _prev: ActionResult | null,
   formData: FormData,
 ): Promise<ActionResult> {
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   const term = String(formData.get('term') ?? '').trim();
   const sessionId = String(formData.get('sessionId') ?? '');
   if (term.length === 0) return { ok: false, message: '没有可保存的表达' };

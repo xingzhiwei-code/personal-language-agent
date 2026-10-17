@@ -14,7 +14,7 @@ const CONFIDENCE_LABELS: Record<string, string> = {
 };
 
 export default async function PlacementPage() {
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   const view = await getPlacementView(ctx, learnerId);
   const placement = view.placement;
 

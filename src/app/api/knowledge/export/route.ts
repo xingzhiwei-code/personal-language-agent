@@ -27,7 +27,7 @@ export async function GET(request: Request): Promise<Response> {
     if (!(status in STATUS_MAP)) {
       return Response.json({ error: '筛选条件无效' }, { status: 400 });
     }
-    const { ctx, learnerId } = app();
+    const { ctx, learnerId } = await app();
     const result = await exportKnowledgeLibrary(ctx, {
       learnerId,
       format,

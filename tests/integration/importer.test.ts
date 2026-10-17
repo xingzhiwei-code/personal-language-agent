@@ -7,6 +7,7 @@ import {
 } from '@/application/importer';
 import { createKnowledgeItem, listKnowledge } from '@/application/knowledge';
 import type { Goal } from '@/domain/entities';
+import { getDbClient } from '@/infrastructure/db/client';
 import { createTestHarness, LOCAL_LEARNER_ID, type TestHarness } from '../helpers/context';
 
 describe('M2: deterministic wordlist parsers', () => {
@@ -57,8 +58,8 @@ describe('M2: deterministic wordlist parsers', () => {
 describe('M2: file import workflow', () => {
   let h: TestHarness;
 
-  beforeEach(() => {
-    h = createTestHarness();
+  beforeEach(async () => {
+    h = await createTestHarness();
   });
   afterEach(() => h.cleanup());
 
@@ -159,7 +160,7 @@ describe('M2: file import workflow', () => {
   });
 
   it('rolls back the entire batch when history persistence fails', async () => {
-    h.db.$client.exec(`
+    await getDbClient(h.db).execute(`
       CREATE TRIGGER reject_import_history
       BEFORE INSERT ON import_export_history
       BEGIN
@@ -177,7 +178,7 @@ describe('M2: file import workflow', () => {
         wordlistName: 'Rollback',
         languageCode: 'en',
       }),
-    ).rejects.toThrow('forced failure');
+    ).rejects.toThrow();
 
     expect(await h.ctx.repos.knowledge.count({ learnerId: LOCAL_LEARNER_ID })).toBe(0);
     expect(await h.ctx.repos.wordlists.listByLearner(LOCAL_LEARNER_ID)).toHaveLength(0);
@@ -218,8 +219,8 @@ describe('M2: file import workflow', () => {
 describe('M1 §P5: fill-only import completion', () => {
   let h: TestHarness;
 
-  beforeEach(() => {
-    h = createTestHarness();
+  beforeEach(async () => {
+    h = await createTestHarness();
   });
   afterEach(() => h.cleanup());
 

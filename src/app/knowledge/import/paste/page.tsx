@@ -4,8 +4,8 @@ import { app } from '@/server/app';
 
 export const dynamic = 'force-dynamic';
 
-export default function PasteImportPage() {
-  const { ctx } = app();
+export default async function PasteImportPage() {
+  const { ctx } = await app();
   return (
     <div className="space-y-5">
       <header>

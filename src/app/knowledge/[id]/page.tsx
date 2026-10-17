@@ -34,7 +34,7 @@ export default async function KnowledgeDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
 
   let detail;
   try {

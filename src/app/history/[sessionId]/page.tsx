@@ -18,7 +18,7 @@ export default async function SessionDetailPage({
   params: Promise<{ sessionId: string }>;
 }) {
   const { sessionId } = await params;
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
 
   let detail;
   try {

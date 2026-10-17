@@ -17,8 +17,8 @@ import { createTestHarness, type TestHarness } from '../helpers/context';
 describe('goal phases (v0.4 §G2)', () => {
   let h: TestHarness;
 
-  beforeEach(() => {
-    h = createTestHarness();
+  beforeEach(async () => {
+    h = await createTestHarness();
     h.llm.configured = false;
   });
 
@@ -177,8 +177,8 @@ describe('goal phases (v0.4 §G2)', () => {
 describe('multi-goal switching (v0.4 §G6)', () => {
   let h: TestHarness;
 
-  beforeEach(() => {
-    h = createTestHarness();
+  beforeEach(async () => {
+    h = await createTestHarness();
     h.llm.configured = false;
   });
 

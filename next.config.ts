@@ -2,8 +2,15 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  // better-sqlite3 is a native module; keep it external to the server bundle.
-  serverExternalPackages: ['better-sqlite3'],
+  // @libsql/client optionally loads a native SQLite binding for local `file:`
+  // URLs; keep the package external to the server bundle (Turso `libsql://`
+  // URLs use the pure-JS HTTP client at runtime).
+  serverExternalPackages: ['@libsql/client'],
+  // drizzle/*.sql are read by the migration runner at runtime (getDb auto-migrates
+  // on first touch). Include them in the serverless deployment package.
+  outputFileTracingIncludes: {
+    '/**': ['./drizzle/**/*.sql'],
+  },
   experimental: {
     serverActions: {
       bodySizeLimit: '10mb',

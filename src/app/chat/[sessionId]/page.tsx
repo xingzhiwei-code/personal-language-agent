@@ -20,7 +20,7 @@ export default async function ChatSessionPage({
   params: Promise<{ sessionId: string }>;
 }) {
   const { sessionId } = await params;
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
 
   let view;
   try {

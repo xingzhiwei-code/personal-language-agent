@@ -7,7 +7,7 @@ import { app } from '@/server/app';
 export const dynamic = 'force-dynamic';
 
 export default async function HistoryPage() {
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   const entries = await getLearningHistory(ctx, learnerId, 50);
 
   return (

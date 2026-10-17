@@ -29,7 +29,7 @@ export default async function KnowledgeLogsPage({
 }) {
   const { type } = await searchParams;
   const selected = OPERATIONS.find((operation) => operation.value === type)?.value;
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   const logs = await listKnowledgeOperationLogs(ctx, {
     learnerId,
     operations: selected ? [selected] : undefined,

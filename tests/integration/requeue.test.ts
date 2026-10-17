@@ -13,8 +13,8 @@ import { createTestHarness, type TestHarness } from '../helpers/context';
 describe('M3 §D2: wrong-answer requeue', () => {
   let h: TestHarness;
 
-  beforeEach(() => {
-    h = createTestHarness();
+  beforeEach(async () => {
+    h = await createTestHarness();
     h.llm.configured = false;
   });
   afterEach(() => h.cleanup());

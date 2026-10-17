@@ -12,7 +12,7 @@ import { app } from '@/server/app';
 export const dynamic = 'force-dynamic';
 
 export default async function SettingsPage() {
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   const aiAvailable = ctx.llm.isConfigured();
   const memories = await listMemories(ctx, learnerId);
   const preferences = await ctx.repos.preferences.listByLearner(learnerId);

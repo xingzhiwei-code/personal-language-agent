@@ -9,7 +9,7 @@ import { app, toActionError, type ActionResult } from '@/server/app';
 export async function saveExportAction(
   _prev: ActionResult<{ key: string; bytes: number }> | null,
 ): Promise<ActionResult<{ key: string; bytes: number }>> {
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   try {
     const result = await saveExportToStorage(ctx, learnerId);
     return {
@@ -26,7 +26,7 @@ export async function deleteDataAction(
   _prev: ActionResult | null,
   formData: FormData,
 ): Promise<ActionResult> {
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   const confirmation = String(formData.get('confirmation') ?? '');
   try {
     await deleteLearnerData(ctx, learnerId, confirmation);
@@ -50,7 +50,7 @@ export async function updateDailyNewWordBudgetAction(
     return { ok: false, message: `每日新词预算必须是 0–${MAX_DAILY_NEW_WORD_BUDGET} 的整数` };
   }
   try {
-    const { ctx, learnerId } = app();
+    const { ctx, learnerId } = await app();
     await setPreference(ctx, {
       learnerId,
       key: 'daily_new_word_budget',
@@ -66,7 +66,7 @@ export async function updateDailyNewWordBudgetAction(
 }
 
 export async function retireMemoryAction(formData: FormData): Promise<void> {
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   await retireMemory(ctx, learnerId, String(formData.get('memoryId') ?? ''));
   revalidatePath('/settings');
 }

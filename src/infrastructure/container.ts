@@ -12,9 +12,9 @@ import { systemClock, uuidIdGenerator } from './system/clock';
  */
 const globalForContext = globalThis as unknown as { __llaContext?: AppContext };
 
-export function getAppContext(): AppContext {
+export async function getAppContext(): Promise<AppContext> {
   if (!globalForContext.__llaContext) {
-    const db = getDb();
+    const db = await getDb();
     globalForContext.__llaContext = {
       repos: createSqliteRepositories(db),
       clock: systemClock,

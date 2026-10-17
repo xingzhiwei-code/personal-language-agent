@@ -30,8 +30,8 @@ const CANDIDATES: ExtractedPasteCandidate[] = [
 describe('M4: pasted text extraction and confirmation', () => {
   let h: TestHarness;
 
-  beforeEach(() => {
-    h = createTestHarness();
+  beforeEach(async () => {
+    h = await createTestHarness();
     h.llm.reply = JSON.stringify(CANDIDATES);
   });
   afterEach(() => h.cleanup());

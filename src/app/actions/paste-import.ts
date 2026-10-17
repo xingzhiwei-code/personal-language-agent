@@ -16,7 +16,7 @@ export async function extractPastedTextAction(
   formData: FormData,
 ): Promise<ActionResult<PasteExtractionPreview>> {
   try {
-    const { ctx, learnerId } = app();
+    const { ctx, learnerId } = await app();
     const preview = await extractFromPastedText(ctx, {
       learnerId,
       title: String(formData.get('title') ?? ''),
@@ -46,7 +46,7 @@ export async function confirmPastedCandidatesAction(
     } catch {
       throw validationFailed('确认数据无效，请重新提炼');
     }
-    const { ctx, learnerId } = app();
+    const { ctx, learnerId } = await app();
     const result = await confirmPastedCandidates(ctx, {
       learnerId,
       sourceId: String(formData.get('sourceId') ?? ''),

@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 
 /** Human-readable JSON download of all local learning data. */
 export async function GET(): Promise<Response> {
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   try {
     const data = await exportLearnerData(ctx, learnerId);
     const filename = `language-learning-export-${data.exportedAt.slice(0, 10)}.json`;

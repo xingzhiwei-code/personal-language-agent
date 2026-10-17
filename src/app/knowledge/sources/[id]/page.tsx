@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function ContentSourceDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   const source = await ctx.repos.content.findSourceById(id);
   if (!source || source.learnerId !== learnerId || source.extractionMethod !== 'paste') notFound();
   const contents = await ctx.repos.content.listContentBySource(id);

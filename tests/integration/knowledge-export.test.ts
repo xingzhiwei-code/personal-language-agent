@@ -7,8 +7,8 @@ import { createTestHarness, LOCAL_LEARNER_ID, type TestHarness } from '../helper
 describe('M5: knowledge library export', () => {
   let h: TestHarness;
 
-  beforeEach(() => {
-    h = createTestHarness();
+  beforeEach(async () => {
+    h = await createTestHarness();
   });
   afterEach(() => h.cleanup());
 
@@ -37,7 +37,7 @@ describe('M5: knowledge library export', () => {
       tags: ['work'],
     });
 
-    const empty = createTestHarness();
+    const empty = await createTestHarness();
     try {
       const imported = await executeFileImport(empty.ctx, {
         learnerId: LOCAL_LEARNER_ID,

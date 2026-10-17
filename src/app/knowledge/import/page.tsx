@@ -5,7 +5,7 @@ import { app } from '@/server/app';
 export const dynamic = 'force-dynamic';
 
 export default async function KnowledgeImportPage() {
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   const goals = await ctx.repos.goals.listByLearner(learnerId, ['active']);
 
   return (

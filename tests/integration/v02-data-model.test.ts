@@ -26,8 +26,8 @@ import { createTestHarness, type TestHarness } from '../helpers/context';
 describe('M1: pool isolation — imported items must NOT enter the SRS queue', () => {
   let h: TestHarness;
 
-  beforeEach(() => {
-    h = createTestHarness();
+  beforeEach(async () => {
+    h = await createTestHarness();
   });
   afterEach(() => h.cleanup());
 
@@ -85,8 +85,8 @@ describe('M1: pool isolation — imported items must NOT enter the SRS queue', (
 describe('M1: Wordlist repository', () => {
   let h: TestHarness;
 
-  beforeEach(() => {
-    h = createTestHarness();
+  beforeEach(async () => {
+    h = await createTestHarness();
   });
   afterEach(() => h.cleanup());
 
@@ -127,8 +127,8 @@ describe('M1: Wordlist repository', () => {
 describe('M1: ImportExportHistory — idempotency by fileHash', () => {
   let h: TestHarness;
 
-  beforeEach(() => {
-    h = createTestHarness();
+  beforeEach(async () => {
+    h = await createTestHarness();
   });
   afterEach(() => h.cleanup());
 
@@ -216,8 +216,8 @@ describe('M1: ImportExportHistory — idempotency by fileHash', () => {
 describe('M1: KnowledgeOperationLog', () => {
   let h: TestHarness;
 
-  beforeEach(() => {
-    h = createTestHarness();
+  beforeEach(async () => {
+    h = await createTestHarness();
   });
   afterEach(() => h.cleanup());
 
@@ -291,8 +291,8 @@ describe('M1: KnowledgeOperationLog', () => {
 describe('M1: Scenario repository + auto-archive', () => {
   let h: TestHarness;
 
-  beforeEach(() => {
-    h = createTestHarness();
+  beforeEach(async () => {
+    h = await createTestHarness();
   });
   afterEach(() => h.cleanup());
 
@@ -416,8 +416,8 @@ describe('M1: Scenario repository + auto-archive', () => {
 describe('M1: daily_new_word_budget preference', () => {
   let h: TestHarness;
 
-  beforeEach(() => {
-    h = createTestHarness();
+  beforeEach(async () => {
+    h = await createTestHarness();
   });
   afterEach(() => h.cleanup());
 

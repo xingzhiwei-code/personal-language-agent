@@ -16,8 +16,8 @@ import { createTestHarness, LOCAL_LEARNER_ID, type TestHarness } from '../helper
 describe('M6: primary and secondary goals', () => {
   let h: TestHarness;
 
-  beforeEach(() => {
-    h = createTestHarness();
+  beforeEach(async () => {
+    h = await createTestHarness();
   });
   afterEach(() => h.cleanup());
 
@@ -74,8 +74,8 @@ describe('M6: primary and secondary goals', () => {
 describe('M6: scenario lifecycle and bindings', () => {
   let h: TestHarness;
 
-  beforeEach(() => {
-    h = createTestHarness();
+  beforeEach(async () => {
+    h = await createTestHarness();
   });
   afterEach(() => h.cleanup());
 

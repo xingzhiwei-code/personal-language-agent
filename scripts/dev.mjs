@@ -2,14 +2,15 @@ import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 
 /**
- * Hard Node version gate (v0.3 §P3). `better-sqlite3` fails with an ABI
- * mismatch on Node 24, which surfaces as a confusing 500 on the knowledge page.
- * We fail fast at `npm run dev` instead.
+ * Hard Node version gate. The native SQLite driver has been removed, but we
+ * keep the gate to stay aligned with Vercel's Node 20 runtime
+ * (engines.node = 20.x). Fail fast at `npm run dev` instead of hitting a
+ * confusing version drift at deploy time.
  */
 const major = Number(process.versions.node.split('.')[0]);
 if (major !== 20) {
   console.error(
-    `本项目需要 Node 20（当前 Node ${process.versions.node}），请用 nvm use 切换。better-sqlite3 在 Node 24 下无法工作。`,
+    `本项目需要 Node 20（当前 Node ${process.versions.node}），请用 nvm use 切换，与 Vercel 运行时保持一致。`,
   );
   process.exit(1);
 }

@@ -8,7 +8,7 @@ import {
   type WordnetRelationEdge,
 } from '../src/data/wordnet';
 import type { WordRelationRepository } from '../src/domain/ports';
-import { createDb } from '../src/infrastructure/db/client';
+import { createDb, getDbClient } from '../src/infrastructure/db/client';
 import { createSqliteRepositories } from '../src/infrastructure/repositories/sqlite';
 
 /**
@@ -110,7 +110,7 @@ export async function importWordRelations(deps: {
 }
 
 async function main(): Promise<void> {
-  const db = createDb();
+  const db = await createDb();
   const repos = createSqliteRepositories(db);
 
   const anchorLemmas = readAnchorCsvLemmas();
@@ -144,7 +144,7 @@ async function main(): Promise<void> {
     `  anchor coverage: ${result.anchorCoverage.covered}/${result.anchorCoverage.total} anchors have ≥1 relation`,
   );
 
-  db.$client.close();
+  getDbClient(db).close();
 }
 
 // Only run the CLI when executed directly (not when imported by tests).

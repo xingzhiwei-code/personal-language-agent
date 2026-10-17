@@ -26,7 +26,7 @@ export async function createScenarioAction(
     const presetRaw = String(formData.get('timePreset') ?? '');
     const preset = presetRaw ? timeContextPresetSchema.safeParse(presetRaw) : null;
     if (!type.success || (preset && !preset.success)) throw validationFailed('场景类型或时间范围无效');
-    const { ctx, learnerId } = app();
+    const { ctx, learnerId } = await app();
     const scenario = await createScenario(ctx, {
       learnerId,
       name: String(formData.get('name') ?? ''),
@@ -55,7 +55,7 @@ export async function updateScenarioAction(
     if (!status.success || (preset && !preset.success)) {
       throw validationFailed('场景状态或时间范围无效');
     }
-    const { ctx, learnerId } = app();
+    const { ctx, learnerId } = await app();
     await updateScenario(ctx, {
       learnerId,
       scenarioId: String(formData.get('scenarioId') ?? ''),
@@ -76,7 +76,7 @@ export async function deleteScenarioAction(
   formData: FormData,
 ): Promise<ActionResult> {
   try {
-    const { ctx, learnerId } = app();
+    const { ctx, learnerId } = await app();
     await deleteScenario(ctx, learnerId, String(formData.get('scenarioId') ?? ''));
     revalidateGoalViews();
     return { ok: true, message: '场景已删除' };
@@ -90,7 +90,7 @@ export async function bindWordlistGoalAction(
   formData: FormData,
 ): Promise<ActionResult> {
   try {
-    const { ctx, learnerId } = app();
+    const { ctx, learnerId } = await app();
     await bindWordlistToGoal(ctx, {
       learnerId,
       wordlistId: String(formData.get('wordlistId') ?? ''),
@@ -108,7 +108,7 @@ export async function bindItemsToScenarioAction(
   formData: FormData,
 ): Promise<ActionResult<{ count: number }>> {
   try {
-    const { ctx, learnerId } = app();
+    const { ctx, learnerId } = await app();
     const scenario = await bindItemsToScenario(ctx, {
       learnerId,
       scenarioId: String(formData.get('scenarioId') ?? ''),
@@ -131,7 +131,7 @@ export async function unbindItemFromScenarioAction(
   formData: FormData,
 ): Promise<ActionResult> {
   try {
-    const { ctx, learnerId } = app();
+    const { ctx, learnerId } = await app();
     await unbindItemFromScenario(ctx, {
       learnerId,
       scenarioId: String(formData.get('scenarioId') ?? ''),

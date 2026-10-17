@@ -47,7 +47,7 @@ export default async function KnowledgePage({
   }>;
 }) {
   const { q, status, new: isNew, wordlist, tag, page: pageRaw } = await searchParams;
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   const filter = STATUS_FILTERS.find((entry) => entry.value === status) ?? STATUS_FILTERS[0]!;
   const page = Math.max(1, Number.parseInt(pageRaw ?? '1', 10) || 1);
   const wordlists = await ctx.repos.wordlists.listByLearner(learnerId);

@@ -9,8 +9,8 @@ import { createTestHarness, LOCAL_LEARNER_ID, type TestHarness } from '../helper
 describe('M3: knowledge operation audit trail', () => {
   let h: TestHarness;
 
-  beforeEach(() => {
-    h = createTestHarness();
+  beforeEach(async () => {
+    h = await createTestHarness();
   });
   afterEach(() => h.cleanup());
 

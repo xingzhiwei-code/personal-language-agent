@@ -23,7 +23,7 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 export default async function GoalsPage() {
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   const goals = await listGoalsWithTargets(ctx, learnerId);
   const goalEntities = goals.map(({ goal }) => goal);
   const placementView = await getPlacementView(ctx, learnerId);

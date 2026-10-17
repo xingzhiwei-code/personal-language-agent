@@ -34,7 +34,7 @@ export async function previewKnowledgeFileAction(
     const content = decodeUtf8(bytes);
     const fileHash = `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
     const languageCode = String(formData.get('languageCode') ?? 'en');
-    const { ctx, learnerId } = app();
+    const { ctx, learnerId } = await app();
     const preview = await previewFileImport(ctx, {
       learnerId,
       fileName: file.name,
@@ -54,7 +54,7 @@ export async function confirmKnowledgeFileImportAction(
   _previous: ActionResult<FileImportResult> | null,
   formData: FormData,
 ): Promise<ActionResult<FileImportResult>> {
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   const fileHash = String(formData.get('fileHash') ?? '');
   try {
     if (!HASH_PATTERN.test(fileHash)) throw validationFailed('上传预览已失效，请重新选择文件');

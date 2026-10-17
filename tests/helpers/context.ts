@@ -5,7 +5,7 @@ import type { AppContext } from '@/application/types';
 import { LOCAL_LEARNER_ID } from '@/application/types';
 import type { Clock, LLMProvider, LlmCompletionResult } from '@/domain/ports';
 import { DomainError } from '@/domain/errors';
-import { createDb, type Db } from '@/infrastructure/db/client';
+import { createDb, getDbClient, type Db } from '@/infrastructure/db/client';
 import { InMemoryTelemetry } from '@/infrastructure/observability/telemetry';
 import { createSqliteRepositories } from '@/infrastructure/repositories/sqlite';
 import { LocalObjectStorage } from '@/infrastructure/storage/local-object-storage';
@@ -70,14 +70,16 @@ export interface TestHarness {
   dir: string;
   dbPath: string;
   /** Re-opens the same database file, simulating an application restart. */
-  reopen(): TestHarness;
+  reopen(): Promise<TestHarness>;
   cleanup(): void;
 }
 
-export function createTestHarness(options: { dir?: string; iso?: string } = {}): TestHarness {
+export async function createTestHarness(
+  options: { dir?: string; iso?: string } = {},
+): Promise<TestHarness> {
   const dir = options.dir ?? mkdtempSync(join(tmpdir(), 'lla-test-'));
   const dbPath = join(dir, 'test.db');
-  const db = createDb({ path: dbPath });
+  const db = await createDb({ path: dbPath });
   const clock = new TestClock(options.iso);
   const llm = new FakeLlmProvider();
   const telemetry = new InMemoryTelemetry();
@@ -100,12 +102,12 @@ export function createTestHarness(options: { dir?: string; iso?: string } = {}):
     dir,
     dbPath,
     reopen() {
-      db.$client.close();
+      getDbClient(db).close();
       return createTestHarness({ dir, iso: clock.nowIso() });
     },
     cleanup() {
       try {
-        db.$client.close();
+        getDbClient(db).close();
       } catch {
         // already closed
       }

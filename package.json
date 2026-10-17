@@ -23,7 +23,7 @@
     "verify": "npm run typecheck && npm run lint && npm run test"
   },
   "dependencies": {
-    "better-sqlite3": "^11.10.0",
+    "@libsql/client": "^0.18.0",
     "drizzle-orm": "^0.44.2",
     "next": "^15.3.4",
     "react": "^19.1.0",
@@ -33,7 +33,6 @@
   "devDependencies": {
     "@playwright/test": "^1.53.1",
     "@tailwindcss/postcss": "^4.1.11",
-    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20.19.1",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",

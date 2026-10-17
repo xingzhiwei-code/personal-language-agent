@@ -13,8 +13,8 @@ import { createTestHarness, type TestHarness } from '../helpers/context';
 describe('auto-calibration (v0.5 §W3)', () => {
   let h: TestHarness;
 
-  beforeEach(() => {
-    h = createTestHarness();
+  beforeEach(async () => {
+    h = await createTestHarness();
   });
 
   afterEach(() => h.cleanup());

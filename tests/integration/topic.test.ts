@@ -12,8 +12,8 @@ import { createTestHarness, type TestHarness } from '../helpers/context';
 describe('daily-one-topic rotation (v0.4 §G3)', () => {
   let h: TestHarness;
 
-  beforeEach(() => {
-    h = createTestHarness();
+  beforeEach(async () => {
+    h = await createTestHarness();
     h.llm.configured = false;
   });
 

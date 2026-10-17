@@ -6,7 +6,7 @@ import { app } from '@/server/app';
 export const dynamic = 'force-dynamic';
 
 export default async function ContentSourcesPage() {
-  const { ctx, learnerId } = app();
+  const { ctx, learnerId } = await app();
   const sources = await ctx.repos.content.listSourcesByLearner(learnerId, 1000);
   const pasted = sources.filter((source) => source.extractionMethod === 'paste');
   return (

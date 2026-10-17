@@ -8,8 +8,8 @@ import { getAppContext } from '@/infrastructure/container';
  * services still take an explicit learnerId so multi-user can be added later
  * without changing the domain.
  */
-export function app(): { ctx: AppContext; learnerId: string } {
-  return { ctx: getAppContext(), learnerId: LOCAL_LEARNER_ID };
+export async function app(): Promise<{ ctx: AppContext; learnerId: string }> {
+  return { ctx: await getAppContext(), learnerId: LOCAL_LEARNER_ID };
 }
 
 export type ActionResult<T = undefined> =
