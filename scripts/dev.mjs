@@ -2,15 +2,14 @@ import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 
 /**
- * Hard Node version gate. The native SQLite driver has been removed, but we
- * keep the gate to stay aligned with Vercel's Node 20 runtime
- * (engines.node = 20.x). Fail fast at `npm run dev` instead of hitting a
+ * Hard Node version gate. Keep local dev aligned with Vercel's Node 22 runtime
+ * (engines.node = 22.x). Fail fast at `npm run dev` instead of hitting a
  * confusing version drift at deploy time.
  */
 const major = Number(process.versions.node.split('.')[0]);
-if (major !== 20) {
+if (major !== 22) {
   console.error(
-    `本项目需要 Node 20（当前 Node ${process.versions.node}），请用 nvm use 切换，与 Vercel 运行时保持一致。`,
+    `本项目需要 Node 22（当前 Node ${process.versions.node}），请用 nvm use 切换，与 Vercel 运行时保持一致。`,
   );
   process.exit(1);
 }
